@@ -33,10 +33,14 @@
 .cr-grid2 .cr-in,.cr-grid2 .cr-val{width:auto;flex:1;min-width:0}
 .cr-checks{display:flex;gap:10px;align-items:center}
 .cr-check{display:inline-flex;gap:4px;align-items:center;font-size:11px}
-.cr-photo{position:relative;height:2.2in;background:var(--p-fill);overflow:hidden}
-.cr-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.cr-photo,.cr-photo-wrap{position:relative;background:var(--p-fill);overflow:hidden}
+.cr-photo{height:2.2in}
+.cr-photo img,.cr-photo-wrap img{width:100%;height:100%;object-fit:cover;display:block}
 .cr-photo-dot{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#c0392b;border:2px solid #fff}
-.cr-photo-link{position:absolute;right:6px;bottom:6px;background:#fff;color:#1d1f22;padding:1px 6px;font-size:11px}
+.cr-photo-cap{position:absolute;left:6px;top:6px;background:#fff;color:#1d1f22;padding:1px 6px;font-size:10px;line-height:1.3;z-index:1}
+.cr-photo-link{position:absolute;right:6px;top:6px;background:#fff;color:#1d1f22;padding:1px 6px;font-size:11px}
+.cr-card .cr-photo-wrap{height:1.25in}
+.cr-card .cr-photo-cap{font-size:9px}
 .cr-empty{display:flex;align-items:center;justify-content:center;color:var(--p-soft);background:var(--p-fill);height:100%;min-height:1.2in}
 .cr-sec{font-size:18px;color:#5b5f66;margin:14px 0 4px;font-family:"Source Sans 3",Arial,sans-serif}
 .cr-table{width:100%;border-collapse:collapse;font-size:10.5px}

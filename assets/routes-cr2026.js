@@ -17476,7 +17476,7 @@ async function Jc(e, t, n, r) {
   let i = t.comps.slice(0, 4),
     [a, o] = await Promise.all([
       $c([t.subject, ...t.comps]),
-      Promise.all([t.subject, ...i].map((e) => el(e.pin))),
+      Promise.all([t.subject, ...i].map((e) => el(e))),
     ]);
   await Yc(e, t, n, r, a, o, i);
 }
@@ -17572,17 +17572,25 @@ async function Yc(e, t, n, r, i, a, o) {
         borderColor: Wc,
         borderWidth: 0.5,
       }),
-      r)
+      r && r.bytes)
     )
       try {
-        let t = await e.embedJpg(r),
-          i = nl(t.width, t.height, g - 4, 80);
-        s.drawImage(t, {
-          x: n + (g - i.w) / 2,
-          y: 392 + (84 - i.h) / 2,
-          width: i.w,
-          height: i.h,
-        });
+        let t = await crEmbedPhoto(e, r),
+          i = t ? nl(t.width, t.height, g - 4, 72) : null;
+        if (t && i)
+          s.drawImage(t, {
+            x: n + (g - i.w) / 2,
+            y: 392 + (76 - i.h) / 2,
+            width: i.w,
+            height: i.h,
+          });
+        else il(s, c, `No photo`, n + 6, 428, 8, Uc);
+        if (r && r.bytes && crPhotoCaption(r.source)) {
+          let p = crPhotoCaption(r.source),
+            w = Math.min(g - 4, p.length * 3.7 + 8);
+          s.drawRectangle({ x: n + 2, y: 466, width: w, height: 10, color: Bo(1, 1, 1) });
+          il(s, c, p, n + 4, 468, 6, Uc);
+        }
       } catch {
         il(s, c, `No photo`, n + 6, 428, 8, Uc);
       }
@@ -17752,7 +17760,7 @@ async function $c(e) {
   }
 }
 async function el(e) {
-  return null;
+  return await crPinPhotoBytes(e);
   try {
     let t = await Vc({ data: e });
     return t ? await tl(t) : null;
@@ -17932,30 +17940,7 @@ function vl(e) {
   return (_l.set(e, n), n);
 }
 function yl({ pin: e }) {
-  let [t, n] = (0, C.useState)(null),
-    [r, i] = (0, C.useState)(!1);
-  return (
-    (0, C.useEffect)(() => {
-      let t = !1;
-      return (
-        vl(e)
-          .then((e) => {
-            t || (n(e || null), i(!0));
-          })
-          .catch(() => {
-            t || i(!0);
-          }),
-        () => {
-          t = !0;
-        }
-      );
-    }, [e]),
-    r
-      ? t
-        ? (0, $.jsx)(`img`, { src: t, alt: `` })
-        : null
-      : (0, $.jsx)(`span`, { className: `pin-photo-wait` })
-  );
+  return (0, $.jsx)(CrPropertyPhoto, { pin: e, variant: `thumb` });
 }
 function bl({ pins: e, empty: t = `No PIN`, size: n = `compact` }) {
   let r = e.flatMap((e) => {
@@ -20784,6 +20769,156 @@ function crSavedPicks(e, t) {
     i = t.filter((e) => r.has(`${crPin14(e.keypin || e.pin)}|${Math.round(e.salePrice || 0)}`));
   return i.length ? new Set(i.map(Au)) : null;
 }
+/* Property photos: first Assessor building picture (_AA on the PIN page); Esri aerial only when that photo is missing (vacant land, 404, or load failure). */
+var CR_PHOTO_MS = 8000,
+  /* Used only to read image bytes for the PTAB PDF. The Assessor CDN does not send CORS headers, and CloudFront 403s non-browser clients (wsrv.nl and similar). */
+  CR_PHOTO_CORS = `https://api.allorigins.win/raw?url=`,
+  crPhotoCache = new Map();
+function crAssessorPhotoUrls(e) {
+  let t = crPin14(e);
+  if (!t) return [];
+  let n = `https://prodassets.cookcountyassessoril.gov/s3fs-public/pin_detail/${t.slice(0, 3)}-${t.slice(3, 5)}/${t.slice(5, 8)}/${t}_AA`;
+  return [`${n}.jpg`, `${n}.JPG`];
+}
+function crPhotoCaption(e) {
+  return e === `assessor` ? `Assessor photo` : e === `aerial` ? `Aerial` : ``;
+}
+function crIsImageBytes(e) {
+  return !!(e && e.length > 24 && ((e[0] === 0xff && e[1] === 0xd8 && e[2] === 0xff) || (e[0] === 0x89 && e[1] === 0x50 && e[2] === 0x4e && e[3] === 0x47)));
+}
+function crIsPngBytes(e) {
+  return !!(e && e[0] === 0x89 && e[1] === 0x50 && e[2] === 0x4e && e[3] === 0x47);
+}
+function crPhotoProxy(e) {
+  return `${CR_PHOTO_CORS}${encodeURIComponent(e)}`;
+}
+function crPhotoRec(e) {
+  if (e != null && typeof e == `object`)
+    return { pin: crPin14(e.pin ?? e.keypin ?? ``), lat: e.lat, lng: e.lng };
+  return { pin: crPin14(e), lat: void 0, lng: void 0 };
+}
+async function crFetchBytes(e, t = CR_PHOTO_MS) {
+  let n = new AbortController(),
+    r = setTimeout(() => n.abort(), t);
+  try {
+    let t = await fetch(e, { signal: n.signal, mode: `cors`, credentials: `omit` });
+    if (!t.ok) return null;
+    let i = new Uint8Array(await t.arrayBuffer());
+    return crIsImageBytes(i) ? i : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(r);
+  }
+}
+function crProbeUrl(e, t = CR_PHOTO_MS) {
+  return new Promise((n) => {
+    let r = new Image(),
+      i = 0,
+      a = (e) => {
+        if (!i) return;
+        clearTimeout(i);
+        i = 0;
+        r.onload = r.onerror = null;
+        n(e);
+      };
+    i = setTimeout(() => a(null), t);
+    r.decoding = `async`;
+    r.onload = () => a(r.naturalWidth > 16 ? e : null);
+    r.onerror = () => a(null);
+    r.src = e;
+  });
+}
+function crRaceTimeout(e, t) {
+  return Promise.race([e, new Promise((e) => setTimeout(() => e(null), t))]);
+}
+async function crFirstAssessorUrl(e) {
+  let t = crAssessorPhotoUrls(e);
+  if (!t.length) return null;
+  let n = await crRaceTimeout(Promise.all(t.map((e) => crProbeUrl(e, 6000))), CR_PHOTO_MS);
+  return (n && n.find(Boolean)) || null;
+}
+async function crPinPhotoBytes(e) {
+  let { pin: t, lat: n, lng: r } = crPhotoRec(e),
+    i = t ? crPhotoCache.get(t) : null;
+  if (i && i.source === `assessor` && crIsImageBytes(i.bytes)) return i;
+  if (t && i?.source !== `none`) {
+    let a = crAssessorPhotoUrls(t);
+    for (let o of a) {
+      let s = await crFetchBytes(o, 2000);
+      if (s) {
+        let c = { bytes: s, source: `assessor` };
+        return (crPhotoCache.set(t, c), c);
+      }
+    }
+    let l = await crRaceTimeout(
+      (async () => {
+        let e = await Promise.all(a.map((e) => crFetchBytes(crPhotoProxy(e), 7000)));
+        return e.find((e) => crIsImageBytes(e)) || null;
+      })(),
+      CR_PHOTO_MS,
+    );
+    if (crIsImageBytes(l)) {
+      let e = { bytes: l, source: `assessor` };
+      return (crPhotoCache.set(t, e), e);
+    }
+    crPhotoCache.set(t, { source: `none`, bytes: null });
+  }
+  if (n != null && r != null) {
+    let e = crAerial(n, r);
+    if (e) {
+      let t = await crFetchBytes(e, 8000);
+      if (t) return { bytes: t, source: `aerial` };
+    }
+  }
+  return { bytes: null, source: null };
+}
+async function crEmbedPhoto(e, t) {
+  if (!t || !crIsImageBytes(t.bytes)) return null;
+  try {
+    return crIsPngBytes(t.bytes) ? await e.embedPng(t.bytes) : await e.embedJpg(t.bytes);
+  } catch {
+    return null;
+  }
+}
+function CrPropertyPhoto({ pin: e, lat: t, lng: n, alt: r, variant: i = `report`, heading: a, showStreet: o }) {
+  let [s, c] = (0, C.useState)({ src: null, source: null, ready: !1 });
+  (0, C.useEffect)(() => {
+    let r = !0;
+    c({ src: null, source: null, ready: !1 });
+    (async () => {
+      let i = crPin14(e) ? await crFirstAssessorUrl(e) : null;
+      if (!r) return;
+      if (i) return void c({ src: i, source: `assessor`, ready: !0 });
+      let a = t != null && n != null ? crAerial(t, n) : null;
+      if (!r) return;
+      c({ src: a, source: a ? `aerial` : null, ready: !0 });
+    })();
+    return () => {
+      r = !1;
+    };
+  }, [e, t, n]);
+  let l = crPhotoCaption(s.source);
+  if (i === `thumb`)
+    return s.src
+      ? (0, $.jsx)(`img`, { src: s.src, alt: ``, title: l })
+      : s.ready
+        ? null
+        : (0, $.jsx)(`span`, { className: `pin-photo-wait` });
+  if (!s.src)
+    return (0, $.jsx)(`div`, { className: i === `card` ? `cr-empty` : `cr-photo cr-empty`, children: s.ready ? `No photo` : `\u00a0` });
+  return (0, $.jsxs)(`div`, {
+    className: `${i === `card` ? `cr-photo-wrap` : `cr-photo cr-photo-wrap`}${s.source === `aerial` && i === `report` ? ` is-aerial` : ``}`,
+    children: [
+      (0, $.jsx)(`img`, { src: s.src, alt: r || l || `Property photo` }),
+      s.source === `aerial` && i === `report` ? (0, $.jsx)(`span`, { className: `cr-photo-dot` }) : null,
+      l ? (0, $.jsx)(`span`, { className: `cr-photo-cap`, children: l }) : null,
+      o && t != null && n != null
+        ? (0, $.jsx)(`a`, { className: `cr-photo-link no-print`, href: ne(t, n, a || 0), target: `bor-street-view`, rel: `noreferrer`, children: `Street view` })
+        : null,
+    ],
+  });
+}
 /* ---------- Subject lookup from public Cook County data (PIN is the key) ---------- */
 var CR_SODA = `https://datacatalog.cookcountyil.gov/resource/`;
 async function crSoda(e, t) {
@@ -21170,11 +21305,7 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
           crBox(`Document Name / Notes`, (0, $.jsx)(crNote, { k: `docName`, value: i.docName, rows: 4, onChange: (e) => a(`docName`, e) }), `cr-w40`),
         ] }),
         (0, $.jsxs)(`div`, { className: `cr-row`, children: [
-          crBox(o, s ? (0, $.jsxs)(`div`, { className: `cr-photo`, children: [
-            (0, $.jsx)(`img`, { src: crAerial(s.lat, s.lng), alt: `Aerial of the subject` }),
-            (0, $.jsx)(`span`, { className: `cr-photo-dot` }),
-            (0, $.jsx)(`a`, { className: `cr-photo-link no-print`, href: ne(s.lat, s.lng, e.heading || 0), target: `bor-street-view`, rel: `noreferrer`, children: `Street view` }),
-          ] }) : (0, $.jsx)(`div`, { className: `cr-photo cr-empty`, children: `No location yet` }), `cr-w45`),
+          crBox(o, crPin14(e.pin) || s ? (0, $.jsx)(CrPropertyPhoto, { pin: e.pin, lat: s?.lat, lng: s?.lng, alt: `Subject property`, variant: `report`, heading: e.heading || 0, showStreet: !0 }) : (0, $.jsx)(`div`, { className: `cr-photo cr-empty`, children: `No location yet` }), `cr-w45`),
           crBox(`Reviewer Value Conclusions`, (0, $.jsxs)($.Fragment, { children: [
             (0, $.jsxs)(`div`, { className: `cr-grid2`, children: [
               crKV(`NEW AV`, crV(crN(i.newAv))), crKV(`NEW VALUE`, crV(crD(i.newValue, 2))),
@@ -21217,7 +21348,7 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
           (0, $.jsxs)(`div`, { children: [(0, $.jsx)(`span`, { children: `AVERAGE SALE PRICE` }), (0, $.jsx)(`b`, { children: d == null ? `—` : j(d, 2) })] }),
         ] }),
         (0, $.jsx)(`div`, { className: `cr-cards`, children: i.comps.length ? i.comps.slice(0, 6).map((e, t) => (0, $.jsxs)(`div`, { className: `cr-card${e.manual ? ` is-m` : ``}`, children: [
-          e.lat != null ? (0, $.jsx)(`img`, { src: crAerial(e.lat, e.lng), alt: `` }) : (0, $.jsx)(`div`, { className: `cr-empty`, children: `No photo` }),
+          e.pin || e.lat != null ? (0, $.jsx)(CrPropertyPhoto, { pin: e.pin, lat: e.lat, lng: e.lng, variant: `card`, alt: `` }) : (0, $.jsx)(`div`, { className: `cr-empty`, children: `No photo` }),
           (0, $.jsxs)(`div`, { className: `cr-card-b`, children: [
             (0, $.jsx)(`b`, { children: `${t + 1}. ${e.address || k(e.pin)}` }),
             (0, $.jsx)(`span`, { children: [crPin14(e.pin) ? k(crPin14(e.pin)) : `No PIN`, e.classCode ? `Class ${e.classCode}` : ``].filter(Boolean).join(` · `) }),

@@ -98,9 +98,14 @@ The report's income page uses the worksheet's NOI and loaded cap (market value =
 
 Equitability page: the search group is the subject's latest `csik-bsws` year, the same investment rating, size tier (A <5k, B 5–15k, C 15–50k, D 50–150k, E 150k+ sf, by building sf), the same major class, and the same township as the location. It falls back to countywide when fewer than 5 records match. Workbook PGI = average rent/sf × SQFT. Market gross workbook = average final value/sf × SQFT. Both averages can be overridden.
 
+## Property photos
+
+The subject and each comparable (auto and analyst-entered) use the first building photograph from the Cook County Assessor PIN page (`prodassets.cookcountyassessoril.gov/s3fs-public/pin_detail/…/{PIN}_AA.jpg` or `.JPG`). Street View imagery on that page is skipped. If the Assessor has no building photo — typical for vacant land — or the photo fails to load, the report falls back to an Esri World Imagery aerial. Each image is captioned **Assessor photo** or **Aerial**. A Street View link remains on the subject's on-screen photo (not printed).
+
+The Analyst Report and the on-screen PIN thumbnails load the Assessor file directly in an `<img>` (no CORS needed) and switch to the aerial on error, with an 8-second timeout so a print never hangs. The PTAB PDF has to embed image bytes; the Assessor CDN does not send CORS headers, and CloudFront blocks non-browser clients, so those bytes are read through `api.allorigins.win` only for the PDF. If that route is slow or down, the exhibit uses the aerial instead. Aerials come from Esri, which already allows CORS.
+
 ## Not included
 
-* Property photos: the original pulled them through a Grok server function that a static host can't call. The report uses Esri World Imagery aerials and a Street View link instead.
 * Location rating isn't in the public Assessor data, so it's an editable box (the township is used as the location filter).
 
 
