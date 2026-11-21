@@ -282,3 +282,16 @@ main{max-width:100%;overflow-x:clip}
 @media print{.cr-grid thead{display:table-header-group}.cr-grid tr{break-inside:avoid}.cr-grid-wrap{overflow:visible}}
 .btn-primary{background:var(--color-accent,#c9a227);color:#14160f;border-color:var(--color-accent,#c9a227);font-weight:600}
 .btn-primary:not(:disabled):hover{filter:brightness(1.06)}
+
+.btn:active,.cr-go:active,.btn.is-busy,.cr-go.is-busy{transform:translateY(1px);filter:brightness(.92)}
+.btn.is-busy,.cr-go.is-busy{pointer-events:none;opacity:.92}
+.btn.is-busy::before,.cr-go.is-busy::before{content:"";display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:cr-spin .7s linear infinite}
+@keyframes cr-spin{to{transform:rotate(360deg)}}
+.cr-toast.is-err{background:#4a1515;color:#ffd6d6;border-color:#e07070}
+.cr-pdf-modal{position:fixed;inset:0;z-index:10000;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px}
+.cr-pdf-modal-card{background:var(--color-surface,#fff);color:inherit;width:min(960px,100%);height:min(90vh,900px);display:flex;flex-direction:column;border-radius:10px;box-shadow:0 12px 40px #0006;overflow:hidden}
+.cr-pdf-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--color-border,#ddd);flex-wrap:wrap}
+.cr-pdf-modal-actions{display:flex;gap:8px}
+.cr-pdf-modal-msg{margin:0;padding:8px 14px;font-size:13px;color:var(--color-muted,#444)}
+.cr-pdf-modal-frame{flex:1;width:100%;border:0;background:#525659}
+@media print{.cr-pdf-modal{display:none!important}}

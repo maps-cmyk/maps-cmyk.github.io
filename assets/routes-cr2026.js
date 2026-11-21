@@ -17869,9 +17869,8 @@ async function ll(e, t, n, r) {
 }
 async function ul(e, t, n, w) {
   let r = cl(e.kind),
-    i = await fetch(r.file);
-  if (!i.ok) throw Error(`The PTAB form did not load.`);
-  let a = await ll(await i.arrayBuffer(), e, t, n),
+    i = await crGetPtabForm(),
+    a = await ll(i, e, t, n),
     o = new Blob([a.buffer.slice(a.byteOffset, a.byteOffset + a.byteLength)], {
       type: `application/pdf`,
     }),
@@ -18982,7 +18981,7 @@ function Du({
       if (r !== ge.current) return;
       let n = e.filter((e) => e.keypin !== c.keypin);
       (w(n),
-        ae(crDefaultPicks(c, n)),
+        ae((() => { let p = crDefaultPicks(c, n); try { crPreloadCasePhotos(c, n.filter((e) => p.has(Au(e)))); } catch {} return p; })()),
         E(t),
         se(`idle`));
     } catch {
@@ -20610,7 +20609,7 @@ function CrCasePanel({ sheet: e, sheets: t, patch: n, onLookup: r, onExtract: x,
                 : (0, $.jsx)(`span`, { className: s.length ? `cr-warn` : ``, children: `${s.length}/14 digits · dashes optional` }) }),
             ] }),
           ] }),
-          (0, $.jsx)(`button`, { type: `button`, className: `cr-go`, disabled: !o, onClick: go, "data-cr": `lookup`, children: crLookupBusy.has(o) ? `Looking up…` : `Look up property` }),
+          (0, $.jsx)(`button`, { type: `button`, className: `cr-go${crLookupBusy.has(o) ? ` is-busy` : ``}`, disabled: !o || crLookupBusy.has(o), "aria-busy": crLookupBusy.has(o), onClick: go, "data-cr": `lookup`, children: crLookupBusy.has(o) ? `Looking up…` : `Look up property` }),
         ] });
   return (0, $.jsxs)(`section`, {
     className: `no-print mt-4`,
@@ -21005,6 +21004,9 @@ function crPreloadPinPhotos(e) {
 function crPreloadCasePhotos(e, t) {
   crPreloadPinPhotos(e);
   for (let n of t || []) crPreloadPinPhotos(n);
+  try {
+    crCompEnrich([e, ...(t || [])].map((e) => e?.pin || e?.keypin || e), () => {});
+  } catch {}
 }
 async function crPinPhotoBytes(e) {
   try {
@@ -21875,8 +21877,8 @@ function CrManualCompForm({ subject: e, comps: t, onChange: n, editId: r, setEdi
             ] }),
             v.length ? (0, $.jsx)(`p`, { className: `text-xs`, style: { color: `#b45309` }, children: `Outside the automatic screen: ${v.join(`; `)}. It stays because you entered it.` }) : null,
             (0, $.jsxs)(`div`, { className: `flex flex-wrap items-center gap-2`, children: [
-              (0, $.jsx)(`button`, { type: `button`, className: `btn`, disabled: u, onClick: y, children: `Locate from PIN / address` }),
-              (0, $.jsx)(`button`, { type: `button`, className: `btn btn-primary`, disabled: u, "data-cr": `save-manual`, onClick: b, children: a ? `Save changes` : `Add comp` }),
+              (0, $.jsx)(`button`, { type: `button`, className: `btn${u ? ` is-busy` : ``}`, disabled: u, "aria-busy": u, onClick: y, children: u ? `Working…` : `Locate from PIN / address` }),
+              (0, $.jsx)(`button`, { type: `button`, className: `btn btn-primary${u ? ` is-busy` : ``}`, disabled: u, "data-cr": `save-manual`, "aria-busy": u, onClick: b, children: u ? `Working…` : a ? `Save changes` : `Add comp` }),
               (0, $.jsx)(`button`, { type: `button`, className: `btn`, onClick: () => (s(CR_MC_EMPTY), i(null), p(!1), l(``)), children: `Cancel` }),
               c ? (0, $.jsx)(`span`, { className: `text-xs text-muted`, "data-cr": `manual-status`, children: c }) : null,
             ] }),
@@ -21958,7 +21960,8 @@ async function crNotesOnAppeal(e, t, n, w) {
   crWarnMissing(e);
   let r = n ? n.bor : crBorFromSheet(e),
     i = [e.pin, ...(r.comps || []).map((e) => e.pin), ...(n?.picked || []).map((e) => e.pin)];
-  await crCompEnrichWait(i);
+  crPhotoDeadline = Date.now();
+  await crCompEnrichWait(i, 200);
   return ul(crBorExtra(r, e), { ...sd(e, t), caseNumber: e.caseNumber || A(e.pin) }, n ? Uu(n) : CR_EMPTY_SALES, w);
 }
 /* Extra pages on the IL form: comments, analyst-entered comps, and blank Additional Notes pages. */
@@ -22078,31 +22081,51 @@ function CrReportButtons({ sheet: e, result: t, summary: n }) {
     [a, o] = (0, C.useState)(``);
   return (0, $.jsxs)($.Fragment, { children: [
     (0, $.jsx)(`button`, {
-      type: `button`, className: `btn btn-primary`, "data-cr": `il-form`, disabled: r || !t,
-      title: `Opens the filled Illinois PTAB-6C notes on appeal, with a full valuation report, named ${crPtabPdfBase(e)}.pdf`,
-      onClick: async () => {
+      type: `button`, className: `btn btn-primary${r ? ` is-busy` : ``}`, "data-cr": `il-form`, disabled: r || !t,
+      "aria-busy": r, title: `Opens the filled Illinois PTAB-6C notes on appeal, with a full valuation report, named ${crPtabPdfBase(e)}.pdf`,
+      onClick: async (ev) => {
+        ev.currentTarget.classList.add(`is-busy`);
         i(!0), o(``);
-        let w = null;
-        try { w = window.open(`about:blank`, `cr-ptab-pdf`); } catch {}
-        try { await crNotesOnAppeal(e, t, n, w); o(`pdf`); } catch (e) {
-          try { w && !w.closed && w.close(); } catch {}
-          o(e instanceof Error ? e.message : `The form could not be filled.`);
+        crPhotoDeadline = Date.now();
+        let name = `${crPtabPdfBase(e)}.pdf`,
+          w = crOpenPdfPlaceholder(name);
+        try {
+          await crNotesOnAppeal(e, t, n, w);
+          o(`pdf`);
+        } catch (err) {
+          try {
+            if (w && !w.closed) {
+              w.document.body.innerHTML = `<div style="font:16px system-ui;padding:32px">The PTAB PDF could not be built.</div>`;
+              setTimeout(() => { try { w.close(); } catch {} }, 2000);
+            }
+          } catch {}
+          let msg = err instanceof Error ? err.message : `The form could not be filled.`;
+          o(msg);
+          crToast(`PTAB PDF failed: ${msg}`, `err`);
         } finally { i(!1); }
       },
-      children: r ? `Preparing…` : `PTAB PDF (State Form)`,
+      children: r ? `Building…` : `PTAB PDF (State Form)`,
     }),
     (0, $.jsx)(`button`, {
-      type: `button`, className: `btn`, "data-cr": `print-report`,
-      title: `Commercial Review Worksheet with comments and Additional Notes pages. Save as PDF: ${crPdfBase(e)}.pdf`,
-      onClick: () => crPrintReport(),
-      children: `Analyst Report`,
+      type: `button`, className: `btn${a === `print` ? ` is-busy` : ``}`, "data-cr": `print-report`,
+      "aria-busy": a === `print`, title: `Commercial Review Worksheet with comments and Additional Notes pages. Save as PDF: ${crPdfBase(e)}.pdf`,
+      onClick: (ev) => {
+        ev.currentTarget.classList.add(`is-busy`);
+        o(`print`);
+        try { crPrintReport(); } catch (err) {
+          let msg = err instanceof Error ? err.message : `The Analyst Report could not be opened.`;
+          o(msg);
+          crToast(`Analyst Report failed: ${msg}`, `err`);
+        } finally { setTimeout(() => o((x) => x === `print` ? `` : x), 800); }
+      },
+      children: a === `print` ? `Building…` : `Analyst Report`,
     }),
     a === `pdf` && crLastPdf
       ? (0, $.jsxs)(`span`, { className: `text-xs text-subtle`, "data-cr": `pdf-fallback`, children: [
-          `Saved as ${crLastPdf.name}. Nothing opened? `,
+          `Saved as ${crLastPdf.name}. `,
           (0, $.jsx)(`a`, { className: `underline`, href: crLastPdf.url, download: crLastPdf.name, target: `_blank`, rel: `noopener`, children: `Open or download the PDF` }),
         ] })
-      : a ? (0, $.jsx)(`span`, { className: `text-xs text-subtle`, children: a }) : null,
+      : a && a !== `print` && a !== `pdf` ? (0, $.jsx)(`span`, { className: `text-xs text-subtle`, "data-cr": `pdf-error`, children: a }) : null,
   ] });
 }
 /* PTAB-6C fill, valuation report pages, and open-in-tab delivery. */
@@ -22193,26 +22216,127 @@ function crFillPtabExtras(s, form, t) {
     }
   }
 }
+function crPtabFormUrl() {
+  let e = `./forms/PTAB6C.pdf`;
+  try {
+    if (typeof cl == `function`) e = cl().file || e;
+  } catch {}
+  try {
+    return new URL(e, document.baseURI).href;
+  } catch {
+    return e;
+  }
+}
+var crPtabFormBuf = null,
+  crPtabFormWait = null;
+function crPrefetchPtabForm() {
+  if (crPtabFormBuf) return Promise.resolve(crPtabFormBuf);
+  if (crPtabFormWait) return crPtabFormWait;
+  crPtabFormWait = fetch(crPtabFormUrl(), { cache: `force-cache` })
+    .then(async (e) => {
+      if (!e.ok) throw Error(`The PTAB form did not load (${e.status}).`);
+      crPtabFormBuf = await e.arrayBuffer();
+      return crPtabFormBuf;
+    })
+    .catch((e) => {
+      crPtabFormWait = null;
+      throw e;
+    });
+  return crPtabFormWait;
+}
+async function crGetPtabForm() {
+  try {
+    let e = crPtabFormBuf || (await crPrefetchPtabForm());
+    return e.slice(0);
+  } catch {
+    let e = await fetch(crPtabFormUrl(), { cache: `reload` });
+    if (!e.ok) throw Error(`The PTAB form did not load (${e.status}). The file must be at ${crPtabFormUrl()}.`);
+    let t = await e.arrayBuffer();
+    crPtabFormBuf = t;
+    return t.slice(0);
+  }
+}
+function crWarmPtab() {
+  try {
+    crPrefetchPtabForm().catch(() => {});
+  } catch {}
+}
+if (typeof window < `u`) {
+  let e = () => crWarmPtab();
+  document.readyState === `loading` ? document.addEventListener(`DOMContentLoaded`, e) : e();
+  window.addEventListener(`load`, e);
+}
+function crEscapeHtml(e) {
+  return String(e ?? ``).replace(/[&<>"']/g, (e) => ({ "&": `&amp;`, "<": `&lt;`, ">": `&gt;`, '"': `&quot;`, "'": `&#39;` }[e]));
+}
+function crOpenPdfPlaceholder(e = `Building PTAB PDF…`) {
+  let t = null;
+  try {
+    t = window.open(``, `_blank`);
+  } catch {}
+  if (!t || t.closed) return null;
+  try {
+    t.document.open();
+    t.document.write(
+      `<!doctype html><html><head><meta charset="utf-8"><title>${crEscapeHtml(e)}</title><style>html,body{margin:0;height:100%;background:#1c2833;color:#f4f6f8;font:15px/1.45 system-ui,Segoe UI,sans-serif;display:flex;align-items:center;justify-content:center}.box{text-align:center;padding:28px}.spin{width:28px;height:28px;border:3px solid #5d6d7e;border-top-color:#fff;border-radius:50%;margin:0 auto 16px;animation:s .7s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="box"><div class="spin"></div><div>Building PTAB PDF…</div></div></body></html>`,
+    );
+    t.document.close();
+    try {
+      t.document.title = e;
+    } catch {}
+  } catch {}
+  return t;
+}
+function crTriggerDownload(e, t) {
+  try {
+    let n = document.createElement(`a`);
+    ((n.href = e), (n.download = t || `PTAB.pdf`), (n.rel = `noopener`), (n.style.display = `none`));
+    document.body.appendChild(n);
+    n.click();
+    n.remove();
+    return !0;
+  } catch {
+    return !1;
+  }
+}
+function crHidePdfModal() {
+  document.getElementById(`cr-pdf-modal`)?.remove();
+}
+function crShowPdfModal(e, t, n) {
+  crHidePdfModal();
+  if (typeof document > `u`) return;
+  let r = document.createElement(`div`);
+  r.id = `cr-pdf-modal`;
+  r.className = `cr-pdf-modal no-print`;
+  r.setAttribute(`role`, `dialog`);
+  r.setAttribute(`aria-modal`, `true`);
+  r.setAttribute(`aria-label`, t || `PTAB PDF`);
+  r.innerHTML = `<div class="cr-pdf-modal-card"><div class="cr-pdf-modal-head"><strong>${crEscapeHtml(t || `PTAB.pdf`)}</strong><div class="cr-pdf-modal-actions"><a class="btn btn-primary" href="${e}" download="${crEscapeHtml(t || `PTAB.pdf`)}" target="_blank" rel="noopener" data-cr="pdf-modal-dl">Download</a><button type="button" class="btn" data-cr="pdf-modal-close">Close</button></div></div><p class="cr-pdf-modal-msg">${crEscapeHtml(n || `The PTAB PDF is ready.`)}</p><iframe class="cr-pdf-modal-frame" title="${crEscapeHtml(t || `PTAB PDF`)}" src="${e}"></iframe></div>`;
+  r.addEventListener(`click`, (e) => {
+    if (e.target === r || e.target.getAttribute(`data-cr`) === `pdf-modal-close`) crHidePdfModal();
+  });
+  document.body.appendChild(r);
+}
 function crPresentPdf(e, t, n) {
   crKeepPdf(e, t);
-  let r = !1,
-    a = String(t || `PTAB.pdf`).replace(/[<>&"'`]/g, ``);
+  let a = String(t || `PTAB.pdf`).replace(/[<>&"'`]/g, ``),
+    r = !1;
   try {
     if (n && !n.closed) {
       try {
-        let i = n.document;
-        i.open();
-        i.write(
-          `<!doctype html><html><head><meta charset="utf-8"><title>${a}</title><style>html,body,embed{margin:0;border:0;width:100%;height:100%;background:#404040}</style></head><body><embed type="application/pdf" src="${e}" title="${a}"></body></html>`,
-        );
-        i.close();
-        i.title = a;
-        r = !0;
-      } catch {
         n.location.replace(e);
         r = !0;
         try {
           n.document.title = a;
+        } catch {}
+      } catch {
+        try {
+          let i = n.document;
+          i.open();
+          i.write(`<!doctype html><html><head><meta charset="utf-8"><title>${a}</title><style>html,body,embed,iframe{margin:0;border:0;width:100%;height:100%;background:#404040}</style></head><body><embed type="application/pdf" src="${e}" title="${a}"></body></html>`);
+          i.close();
+          i.title = a;
+          r = !0;
         } catch {}
       }
     }
@@ -22221,18 +22345,20 @@ function crPresentPdf(e, t, n) {
     try {
       n && !n.closed && n.close();
     } catch {}
-    let i = null;
-    try {
-      i = window.open(e, `cr-ptab-pdf`);
-    } catch {}
-    if (!i || i.closed) {
-      let a = document.createElement(`a`);
-      ((a.href = e), (a.download = t), (a.target = `_blank`), (a.rel = `noopener`));
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
+    crTriggerDownload(e, a);
+    let i = typeof crInFrame == `function` && crInFrame();
+    crShowPdfModal(
+      e,
+      a,
+      i
+        ? `This panel blocked a new tab. Download ${a} or view it here. If this is an Experience Builder Embed, allow popups and downloads on the widget (sandbox: allow-popups, allow-downloads, and allow-popups-to-escape-sandbox).`
+        : `The browser blocked a new tab. Download ${a} or view it here.`,
+    );
+    crToast(`PTAB PDF is ready: ${a}. A new tab was blocked — use Download or the viewer on this page.`);
+  } else {
+    crToast(`Opened ${a} in a new tab. If you do not see it, use Download on this page.`);
   }
+  return r;
 }
 function crPdfFonts(e, t) {
   return { r: e, b: t };
@@ -22484,14 +22610,15 @@ function crMissing(e) {
     !(e.requestedMv > 0 || e.requestedAv > 0) && `Requested amount (MV or AV)`,
   ].filter(Boolean);
 }
-function crToast(e) {
+function crToast(e, n) {
   if (typeof document > `u`) return;
   let t = document.getElementById(`cr-toast`);
-  t || ((t = document.createElement(`div`)), (t.id = `cr-toast`), (t.className = `cr-toast no-print`), t.setAttribute(`role`, `status`), document.body.appendChild(t));
+  t || ((t = document.createElement(`div`)), (t.id = `cr-toast`), t.setAttribute(`role`, `status`), document.body.appendChild(t));
+  t.className = `cr-toast no-print${n === `err` ? ` is-err` : ``}`;
   t.textContent = e;
   t.style.display = `block`;
   clearTimeout(crToast.t);
-  crToast.t = setTimeout(() => (t.style.display = `none`), 9e3);
+  crToast.t = setTimeout(() => (t.style.display = `none`), n === `err` ? 14e3 : 9e3);
 }
 /* Gentle, non-blocking reminder before either report. */
 function crWarnMissing(e = crActiveSheet()) {
