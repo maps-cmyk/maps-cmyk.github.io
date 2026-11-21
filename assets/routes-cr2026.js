@@ -415,7 +415,7 @@ function de(e, t = 0) {
 function fe(e, t) {
   let n = A(e.pin),
     r = [
-      `COOK COUNTY BOARD OF REVIEW — 2026 COMMERCIAL REVIEWS — INCOME APPROACH`,
+      `CAP & REVIEW — 2026 COMMERCIAL REVIEWS — INCOME APPROACH`,
       ...(n ? [`PIN ${n}`] : []),
       ...(e.caseNumber ? [`Docket / Complaint # ${e.caseNumber}`] : []),
       ...(e.analyst ? [`Analyst ${e.analyst}`] : []),
@@ -17493,7 +17493,7 @@ async function Yc(e, t, n, r, i, a, o) {
           : `sales approach`
         : `income approach`,
     p = d != null && n.loa > 0 ? Math.round(d * n.loa) : n.assessed;
-  (s.drawText(`COOK COUNTY BOARD OF REVIEW`, {
+  (s.drawText(`CAP & REVIEW  ·  2026 COMMERCIAL REVIEWS`, {
     x: 36,
     y: 758,
     size: 8,
@@ -17760,7 +17760,12 @@ async function $c(e) {
   }
 }
 async function el(e) {
-  return await crPinPhotoBytes(e);
+  try {
+    let r = await crRaceTimeout(crPinPhotoBytes(e), 6000);
+    return r && r.bytes ? r : { bytes: null, source: null };
+  } catch {
+    return { bytes: null, source: null };
+  }
   try {
     let t = await Vc({ data: e });
     return t ? await tl(t) : null;
@@ -17868,7 +17873,7 @@ async function ll(e, t, n, r) {
 async function ul(e, t, n) {
   let r = cl(e.kind),
     i = await fetch(r.file);
-  if (!i.ok) throw Error(`The Board of Review form did not load.`);
+  if (!i.ok) throw Error(`The PTAB form did not load.`);
   let a = await ll(await i.arrayBuffer(), e, t, n),
     o = new Blob([a.buffer.slice(a.byteOffset, a.byteOffset + a.byteLength)], {
       type: `application/pdf`,
@@ -19659,7 +19664,7 @@ function Vu({ summary: e, loa: t, incomeValue: n, income: r }) {
             children: [
               `Separate from the income worksheet. Checked sales only. The income cap rate and vacancy are the rates the Assessor used on those sales.`,
               f
-                ? ` ${f.label} is the Board of Review notes form for these sales.`
+                ? ` ${f.label} is the PTAB notes form for these sales.`
                 : ``,
             ],
           }),
@@ -20525,7 +20530,7 @@ function CrCasePanel({ sheet: e, sheets: t, patch: n, onLookup: r, onExtract: x,
       let p0 = { ...h.current, ...crLookupPatch(h.current, o) },
         q0 = crRatePatch(p0);
       n({ lookup: o, ...crLookupPatch(h.current, o), ...q0, ...crAssessorApply({ ...h.current, ...crLookupPatch(h.current, o) }, o) });
-      d(o ? `Loaded ${[o.parcel && `location`, o.av.length && `${o.av.length} years of AVs`, o.sales.length && Pu(o.sales.length, `sale`), o.income && `Assessor income ${o.income.year}`, o.bor.length && `BOR decisions`, o.peers && `${o.peers.count} equitability records`].filter(Boolean).join(`, `)}.` : `Nothing found for ${t}.`);
+      d(o ? `Loaded ${[o.parcel && `location`, o.av.length && `${o.av.length} years of AVs`, o.sales.length && Pu(o.sales.length, `sale`), o.income && `Assessor income ${o.income.year}`, o.bor.length && `prior appeal decisions`, o.peers && `${o.peers.count} equitability records`].filter(Boolean).join(`, `)}.` : `Nothing found for ${t}.`);
     } catch (e) {
       d(e instanceof Error ? e.message : `Lookup failed.`);
     } finally {
@@ -20587,7 +20592,7 @@ function CrCasePanel({ sheet: e, sheets: t, patch: n, onLookup: r, onExtract: x,
             (0, $.jsxs)(`label`, { className: `cr-sh cr-req${dk || smp ? `` : ` is-miss`}`, children: [
               (0, $.jsxs)(`span`, { className: `cr-sh-l`, children: [`Case / Docket Number`, (0, $.jsx)(`span`, { className: `cr-ast`, children: ` *` })] }),
               (0, $.jsx)(`input`, { ref: rD, className: `field cr-sh-in`, "data-cr": `docket`, value: e.caseNumber || ``, placeholder: `e.g. 2022-77-16242`, autoComplete: `off`, spellCheck: !1, required: !0, "aria-required": `true`, onChange: (e) => g(e.target.value), onKeyDown: key }),
-              (0, $.jsx)(`span`, { className: `cr-sh-hint`, children: dk ? (0, $.jsx)(`span`, { className: `cr-good`, children: `✓ Docket entered` }) : smp ? `${CR_SAMPLE_LABEL}: optional with sample data.` : `The BOR / PTAB docket or complaint number.` }),
+              (0, $.jsx)(`span`, { className: `cr-sh-hint`, children: dk ? (0, $.jsx)(`span`, { className: `cr-good`, children: `✓ Docket entered` }) : smp ? `${CR_SAMPLE_LABEL}: optional with sample data.` : `The PTAB docket or complaint number.` }),
             ] }),
             (0, $.jsxs)(`label`, { className: `cr-sh cr-req${o ? `` : ` is-miss`}`, children: [
               (0, $.jsxs)(`span`, { className: `cr-sh-l`, children: [`Subject PIN (14 digits)`, (0, $.jsx)(`span`, { className: `cr-ast`, children: ` *` })] }),
@@ -20684,7 +20689,7 @@ function CrCasePanel({ sheet: e, sheets: t, patch: n, onLookup: r, onExtract: x,
               }),
             ],
           }),
-          ` (optional; stays in this browser) to fill complaint status, requested value and the BOR docket fields.`,
+          ` (optional; stays in this browser) to fill complaint status, requested value and the docket fields.`,
         ],
       }),
     ],
@@ -20701,9 +20706,9 @@ var CR_SUBJECT_ROWS = [
   [`Assessor market value`, (e) => [e.inc_fmv && `final ${crFmt$(e.inc_fmv)}`, e.inc_incmv && `income ${crFmt$(e.inc_incmv)}`, e.inc_fmvsf && `${crFmt$(e.inc_fmvsf, 2)}/sf`].filter(Boolean).join(` · `)],
   [`Current AV`, (e) => e.av_cur_tot && `${crFmt$(e.av_cur_tot)} (${[e.av_cur_year, e.av_cur_stage].filter(Boolean).join(` `)})`],
   [`Prior-year AV`, (e) => e.av_prv_tot && `${crFmt$(e.av_prv_tot)} (${[e.av_prv_year, e.av_prv_stage].filter(Boolean).join(` `)})${e.av_yoy_pct ? ` · YoY ${Number(e.av_yoy_pct).toFixed(1)}%` : ``}`],
-  [`BOR decision`, (e) => [e.bor_prev_year, e.bor_result, e.bor_pre_tot && `${crFmt$(e.bor_pre_tot)} → ${crFmt$(e.bor_post_tot)}`, e.bor_chg_pct && `${Number(e.bor_chg_pct).toFixed(1)}%`, e.bor_reason].filter(Boolean).join(` · `) || (e.bor_match ? `No ${e.bor_prev_year || ``} decision joined (${e.bor_match})` : ``)],
+  [`Appeal decision`, (e) => [e.bor_prev_year, e.bor_result, e.bor_pre_tot && `${crFmt$(e.bor_pre_tot)} → ${crFmt$(e.bor_post_tot)}`, e.bor_chg_pct && `${Number(e.bor_chg_pct).toFixed(1)}%`, e.bor_reason].filter(Boolean).join(` · `) || (e.bor_match ? `No ${e.bor_prev_year || ``} decision joined (${e.bor_match})` : ``)],
   [`Last sale`, (e) => [e.sale_date, e.sale_price && crFmt$(e.sale_price), e.sale_mydeed || e.sale_deed, e.sale_doc_no && `doc ${e.sale_doc_no}`].filter(Boolean).join(` · `)],
-  [`BOR appeal / docket`, (e) => [e.BOR_PTAB_Docket_ID && `Docket ${e.BOR_PTAB_Docket_ID}`, e.BOR_Filing_Year && `filed ${e.BOR_Filing_Year}`, e.BOR_PTAB_Status, e.BOR_PTAB_IL_PTAB_Docket_ID && `IL PTAB ${e.BOR_PTAB_IL_PTAB_Docket_ID}`, e.BOR_Complaint_Num && `complaint ${e.BOR_Complaint_Num}`].filter(Boolean).join(` · `)],
+  [`Appeal / docket`, (e) => [e.BOR_PTAB_Docket_ID && `Docket ${e.BOR_PTAB_Docket_ID}`, e.BOR_Filing_Year && `filed ${e.BOR_Filing_Year}`, e.BOR_PTAB_Status, e.BOR_PTAB_IL_PTAB_Docket_ID && `IL PTAB ${e.BOR_PTAB_IL_PTAB_Docket_ID}`, e.BOR_Complaint_Num && `complaint ${e.BOR_Complaint_Num}`].filter(Boolean).join(` · `)],
   [`Appellant / attorney`, (e) => [[e.BOR_PTAB_Appellant_FN, e.BOR_PTAB_Appellant_LN].filter(Boolean).join(` `), e.BOR_Attorney_Firm || [e.BOR_Attorney_FN, e.BOR_Attorney_LN].filter(Boolean).join(` `)].filter(Boolean).join(` · `)],
   [`Request / deadline`, (e) => [e.BOR_PTAB_Valuation_Req && `valuation request ${crFmt$(e.BOR_PTAB_Valuation_Req)}`, e.BOR_Requested_AV && `requested AV ${crFmt$(e.BOR_Requested_AV)}`, e.BOR_PTAB_Deadline_Date && `deadline ${e.BOR_PTAB_Deadline_Date}`].filter(Boolean).join(` · `)],
   [`Tax code`, (e) => e.inc_taxdist],
@@ -20732,7 +20737,7 @@ function CrSubject({ sheet: e }) {
       (0, $.jsxs)(`div`, {
         className: `flex flex-wrap items-end justify-between gap-2`,
         children: [
-          (0, $.jsx)(`h2`, { className: `font-display text-2xl leading-none`, children: `Subject from the map` }),
+          (0, $.jsx)(`h2`, { className: `font-display text-2xl leading-none`, children: `Subject property` }),
           (0, $.jsx)(`span`, {
             className: `text-xs text-subtle`,
             children: `Read-only · Commercial Review Extract · pin14 ${t.pin14}${e.subjectAt ? ` · ${new Date(e.subjectAt).toLocaleString()}` : ``}`,
@@ -20771,8 +20776,6 @@ function crSavedPicks(e, t) {
 }
 /* Property photos: first Assessor building picture (_AA on the PIN page); Esri aerial only when that photo is missing (vacant land, 404, or load failure). */
 var CR_PHOTO_MS = 8000,
-  /* Used only to read image bytes for the PTAB PDF. The Assessor CDN does not send CORS headers, and CloudFront 403s non-browser clients (wsrv.nl and similar). */
-  CR_PHOTO_CORS = `https://api.allorigins.win/raw?url=`,
   crPhotoCache = new Map();
 function crAssessorPhotoUrls(e) {
   let t = crPin14(e);
@@ -20788,9 +20791,6 @@ function crIsImageBytes(e) {
 }
 function crIsPngBytes(e) {
   return !!(e && e[0] === 0x89 && e[1] === 0x50 && e[2] === 0x4e && e[3] === 0x47);
-}
-function crPhotoProxy(e) {
-  return `${CR_PHOTO_CORS}${encodeURIComponent(e)}`;
 }
 function crPhotoRec(e) {
   if (e != null && typeof e == `object`)
@@ -20838,39 +20838,18 @@ async function crFirstAssessorUrl(e) {
   let n = await crRaceTimeout(Promise.all(t.map((e) => crProbeUrl(e, 6000))), CR_PHOTO_MS);
   return (n && n.find(Boolean)) || null;
 }
+/* PDF embed needs CORS-readable bytes. The Assessor CDN has no CORS, and public proxies are unreliable, so the PTAB form uses the Esri aerial (CORS-enabled, hard timeout). The Analyst Report and UI still show Assessor building photos via <img>. */
 async function crPinPhotoBytes(e) {
-  let { pin: t, lat: n, lng: r } = crPhotoRec(e),
-    i = t ? crPhotoCache.get(t) : null;
-  if (i && i.source === `assessor` && crIsImageBytes(i.bytes)) return i;
-  if (t && i?.source !== `none`) {
-    let a = crAssessorPhotoUrls(t);
-    for (let o of a) {
-      let s = await crFetchBytes(o, 2000);
-      if (s) {
-        let c = { bytes: s, source: `assessor` };
-        return (crPhotoCache.set(t, c), c);
+  try {
+    let { lat: n, lng: r } = crPhotoRec(e);
+    if (n != null && r != null) {
+      let i = crAerial(n, r);
+      if (i) {
+        let a = await crFetchBytes(i, 5000);
+        if (a) return { bytes: a, source: `aerial` };
       }
     }
-    let l = await crRaceTimeout(
-      (async () => {
-        let e = await Promise.all(a.map((e) => crFetchBytes(crPhotoProxy(e), 7000)));
-        return e.find((e) => crIsImageBytes(e)) || null;
-      })(),
-      CR_PHOTO_MS,
-    );
-    if (crIsImageBytes(l)) {
-      let e = { bytes: l, source: `assessor` };
-      return (crPhotoCache.set(t, e), e);
-    }
-    crPhotoCache.set(t, { source: `none`, bytes: null });
-  }
-  if (n != null && r != null) {
-    let e = crAerial(n, r);
-    if (e) {
-      let t = await crFetchBytes(e, 8000);
-      if (t) return { bytes: t, source: `aerial` };
-    }
-  }
+  } catch {}
   return { bytes: null, source: null };
 }
 async function crEmbedPhoto(e, t) {
@@ -21251,7 +21230,7 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
         (0, $.jsxs)(`div`, { children: [
           (0, $.jsx)(`p`, { className: `text-xs font-medium tracking-wide text-muted uppercase`, children: `Outputs` }),
           (0, $.jsx)(`h2`, { className: `mt-1 font-display text-2xl leading-none`, children: `Reports` }),
-          (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `PTAB PDF (State Form) downloads the Illinois PTAB Board of Review notes on appeal (PTAB-6C or PTAB-6I) filled from this case: subject, checked sales including analyst-entered comps, exhibit page, and a notes page with your comments. Analyst Report prints the worksheet below. Both are named <docket>_<PIN>.pdf.` }),
+          (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `PTAB PDF (State Form) is the featured report: the Illinois PTAB notes on appeal (PTAB-6C or PTAB-6I) filled from this case (subject, checked sales including analyst-entered comps, exhibit page, comments, and Additional Notes pages). Analyst Report prints the worksheet below. Both are named <docket>_<PIN>.pdf.` }),
           (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `Analyst Report: five letter pages (including the comparable sales grid) plus Additional Notes pages. Boxes and comment fields are editable and saved with the case; values come from the case, the PIN lookup, and the checked sales. Print to PDF from the browser.` }),
         ] }),
         (0, $.jsxs)(`div`, { className: `flex flex-wrap items-end gap-2`, children: [
@@ -21266,24 +21245,24 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
       (0, $.jsxs)(`div`, { className: `cr-page`, children: [
         (0, $.jsxs)(`div`, { className: `cr-head`, children: [
           (0, $.jsxs)(`div`, { className: `cr-head-l`, children: [
-            (0, $.jsx)(`div`, { className: `cr-h1`, children: `Cook County Board of Review` }),
-            (0, $.jsx)(`div`, { className: `cr-h2`, children: `COMMERCIAL REVIEW WORKSHEET` }),
+            (0, $.jsx)(`div`, { className: `cr-h1`, children: `Cap & Review` }),
+            (0, $.jsx)(`div`, { className: `cr-h2`, children: `2026 COMMERCIAL REVIEWS` }),
             (0, $.jsx)(`div`, { className: `cr-h3`, children: `Tax year ${e.taxYear || ``}` }),
           ] }),
           (0, $.jsxs)(`div`, { className: `cr-head-r`, children: [
-            crKV(`BOR Complaint #`, (0, $.jsx)(crIn, { value: e.caseNumber ?? ``, ph: e.sample ? CR_SAMPLE_LABEL : void 0, onChange: (e) => r({ caseNumber: e }) })),
-            crKV(`BOR Complaint Status`, (0, $.jsx)(crIn, { value: i.status, onChange: (e) => a(`status`, e) })),
-            crKV(`BOR Analyst 1`, (0, $.jsx)(crIn, { value: e.analyst ?? ``, onChange: (e) => (crSetAnalyst(e), r({ analyst: e })) })),
-            crKV(`BOR Analyst 2`, (0, $.jsx)(crIn, { value: i.r.analyst2 ?? ``, onChange: (e) => a(`analyst2`, e) })),
-            crKV(`BOR Analyst 3`, (0, $.jsx)(crIn, { value: i.r.analyst3 ?? ``, onChange: (e) => a(`analyst3`, e) })),
+            crKV(`Complaint #`, (0, $.jsx)(crIn, { value: e.caseNumber ?? ``, ph: e.sample ? CR_SAMPLE_LABEL : void 0, onChange: (e) => r({ caseNumber: e }) })),
+            crKV(`Complaint Status`, (0, $.jsx)(crIn, { value: i.status, onChange: (e) => a(`status`, e) })),
+            crKV(`Analyst 1`, (0, $.jsx)(crIn, { value: e.analyst ?? ``, onChange: (e) => (crSetAnalyst(e), r({ analyst: e })) })),
+            crKV(`Analyst 2`, (0, $.jsx)(crIn, { value: i.r.analyst2 ?? ``, onChange: (e) => a(`analyst2`, e) })),
+            crKV(`Analyst 3`, (0, $.jsx)(crIn, { value: i.r.analyst3 ?? ``, onChange: (e) => a(`analyst3`, e) })),
           ] }),
         ] }),
         (0, $.jsxs)(`div`, { className: `cr-row`, children: [
           crBox(`Docket Information`, (0, $.jsxs)($.Fragment, { children: [
-            crKV(`BOR_PIN`, crV(o)),
+            crKV(`PIN`, crV(o)),
             (0, $.jsxs)(`div`, { className: `cr-inline`, children: [
               crKV(`Filing Year`, (0, $.jsx)(crIn, { value: i.filingYear, onChange: (e) => a(`filingYear`, e) })),
-              crKV(`BOR Township`, crV(`${(e.township || ``).toUpperCase()}${i.townshipNum ? `  ${i.townshipNum}` : ``}`)),
+              crKV(`Township`, crV(`${(e.township || ``).toUpperCase()}${i.townshipNum ? `  ${i.townshipNum}` : ``}`)),
             ] }),
             crKV(`Property Address`, crV(e.address)),
           ] }), `cr-w60`),
@@ -21746,12 +21725,12 @@ function CrNotesPage({ sheet: e, n: t, of: r, last: i }) {
   return (0, $.jsxs)(`div`, { className: `cr-page cr-notes-page${i ? ` cr-last` : ``}`, children: [
     (0, $.jsxs)(`div`, { className: `cr-head`, children: [
       (0, $.jsxs)(`div`, { className: `cr-head-l`, children: [
-        (0, $.jsx)(`div`, { className: `cr-h1`, children: `Cook County Board of Review` }),
-        (0, $.jsx)(`div`, { className: `cr-h2`, children: `COMMERCIAL REVIEW WORKSHEET` }),
+        (0, $.jsx)(`div`, { className: `cr-h1`, children: `Cap & Review` }),
+        (0, $.jsx)(`div`, { className: `cr-h2`, children: `2026 COMMERCIAL REVIEWS` }),
         (0, $.jsx)(`div`, { className: `cr-h3`, children: `Tax year ${e.taxYear || ``}` }),
       ] }),
       (0, $.jsxs)(`div`, { className: `cr-head-r`, children: [
-        crKV(`BOR Complaint #`, crV(e.caseNumber || (e.sample ? CR_SAMPLE_LABEL : ``))),
+        crKV(`Complaint #`, crV(e.caseNumber || (e.sample ? CR_SAMPLE_LABEL : ``))),
         crKV(`PIN`, crV(k(A(e.pin)))),
         crKV(`Analyst`, crV(e.analyst || ``)),
       ] }),
@@ -21801,20 +21780,19 @@ async function crNotesOnAppeal(e, t, n) {
   let r = n ? n.bor : crBorFromSheet(e);
   return ul(crBorExtra(r, e), { ...sd(e, t), caseNumber: e.caseNumber || A(e.pin) }, n ? Uu(n) : CR_EMPTY_SALES);
 }
-/* Extra pages on the IL form: Board of Review comments and analyst-entered comps. */
+/* Extra pages on the IL form: comments, analyst-entered comps, and blank Additional Notes pages. */
 async function crNotesPdfPages(e, t) {
   let n = (t.comments ?? []).length,
-    r = (t.manualComps ?? []).length;
-  let q = t.requested;
-  if (!n && !r && !q) return;
-  let i = await e.embedFont(_c.Helvetica),
+    r = (t.manualComps ?? []).length,
+    q = t.requested,
+    i = await e.embedFont(_c.Helvetica),
     a = await e.embedFont(_c.HelveticaBold),
     o = null,
     s = 0,
     c = () => {
       o = e.addPage([612, 792]);
-      o.drawText(`COOK COUNTY BOARD OF REVIEW`, { x: 36, y: 758, size: 8, font: i, color: Uc });
-      o.drawText(`Board of Review notes on appeal`, { x: 36, y: 740, size: 16, font: a, color: Hc });
+      o.drawText(`CAP & REVIEW`, { x: 36, y: 758, size: 8, font: i, color: Uc });
+      o.drawText(`Notes on appeal`, { x: 36, y: 740, size: 16, font: a, color: Hc });
       o.drawText(
         rl([t.caseNumber ? `Complaint # ${t.caseNumber}` : t.sample && CR_SAMPLE_LABEL, `PIN ${k(t.pin)}`, t.analyst && `Analyst ${t.analyst}`, t.address].filter(Boolean).join(`  ·  `), 100),
         { x: 36, y: 722, size: 9, font: i, color: Hc },
@@ -21836,22 +21814,39 @@ async function crNotesPdfPages(e, t) {
     u = (e, t = i, n = 9, r = 12) => {
       for (let i of l(e, t, n)) (s < 48 && c(), o.drawText(i, { x: 36, y: s, size: n, font: t, color: Hc }), (s -= r));
     };
-  c();
-  q &&
-    (u(`Appellant's requested value`, a, 11, 16),
-    u(`Requested market value ${j(q.mv)} · requested assessed value ${j(q.av)} at ${M(q.loa, 0)} (entered as ${q.as === `mv` ? `market value` : `assessed value`}).` +
-      (q.cmp ? ` Board of Review conclusion ${j(q.cmp.concluded)} AV, ${j(Math.abs(q.cmp.delta))} ${q.cmp.delta >= 0 ? `above` : `below`} the request (${q.cmp.delta >= 0 ? `+` : `−`}${(Math.abs(q.cmp.pct) * 100).toFixed(1)}%).` : ``)),
-    (s -= 10));
-  for (let [e, n] of t.comments) (s < 80 && c(), u(e, a, 11, 16), u(n), (s -= 10));
-  if (r) {
-    (s < 100 && c(), u(`Analyst-entered comparable sales`, a, 11, 16));
-    t.manualComps.forEach((e, t) => {
-      let n = crManualRow(e);
-      u(
-        `${t + 1}. ${n.address || `No address`}${n.pin ? ` · PIN ${k(n.pin)}` : ``} · sold ${n.saleDate ? new Date(n.saleDate).toLocaleDateString(`en-US`) : `—`} for ${j(n.salePrice)}` +
-          `${n.nra ? ` · ${Math.round(n.nra).toLocaleString()} sf · ${j(n.salePrice / n.nra, 2)}/sf` : ``}${n.landSf ? ` · land ${Math.round(n.landSf).toLocaleString()} sf` : ``}${n.classCode ? ` · class ${n.classCode}` : ``}${n.geoSource ? ` · location: ${n.geoSource}` : ``}`,
-      );
-    });
+  if (n || r || q) {
+    c();
+    q &&
+      (u(`Appellant's requested value`, a, 11, 16),
+      u(`Requested market value ${j(q.mv)} · requested assessed value ${j(q.av)} at ${M(q.loa, 0)} (entered as ${q.as === `mv` ? `market value` : `assessed value`}).` +
+        (q.cmp ? ` Conclusion ${j(q.cmp.concluded)} AV, ${j(Math.abs(q.cmp.delta))} ${q.cmp.delta >= 0 ? `above` : `below`} the request (${q.cmp.delta >= 0 ? `+` : `−`}${(Math.abs(q.cmp.pct) * 100).toFixed(1)}%).` : ``)),
+      (s -= 10));
+    for (let [e, n] of t.comments) (s < 80 && c(), u(e, a, 11, 16), u(n), (s -= 10));
+    if (r) {
+      (s < 100 && c(), u(`Analyst-entered comparable sales`, a, 11, 16));
+      t.manualComps.forEach((e, t) => {
+        let n = crManualRow(e);
+        u(
+          `${t + 1}. ${n.address || `No address`}${n.pin ? ` · PIN ${k(n.pin)}` : ``} · sold ${n.saleDate ? new Date(n.saleDate).toLocaleDateString(`en-US`) : `—`} for ${j(n.salePrice)}` +
+            `${n.nra ? ` · ${Math.round(n.nra).toLocaleString()} sf · ${j(n.salePrice / n.nra, 2)}/sf` : ``}${n.landSf ? ` · land ${Math.round(n.landSf).toLocaleString()} sf` : ``}${n.classCode ? ` · class ${n.classCode}` : ``}${n.geoSource ? ` · location: ${n.geoSource}` : ``}`,
+        );
+      });
+    }
+  }
+  let sheet = crActiveSheet() || t,
+    pages = crNotesPages(sheet);
+  for (let n = 1; n <= pages; n++) {
+    let p = e.addPage([612, 792]);
+    p.drawText(`CAP & REVIEW`, { x: 36, y: 758, size: 8, font: i, color: Uc });
+    p.drawText(`2026 Commercial Reviews`, { x: 36, y: 740, size: 16, font: a, color: Hc });
+    p.drawText(
+      rl([t.caseNumber ? `Complaint # ${t.caseNumber}` : t.sample && CR_SAMPLE_LABEL, `PIN ${k(t.pin)}`, t.analyst && `Analyst ${t.analyst}`].filter(Boolean).join(`  ·  `), 100),
+      { x: 36, y: 722, size: 9, font: i, color: Hc },
+    );
+    p.drawText(`ADDITIONAL NOTES`, { x: 36, y: 696, size: 12, font: a, color: Hc });
+    for (let y = 678; y > 52; y -= 22)
+      p.drawLine({ start: { x: 36, y }, end: { x: 576, y }, thickness: 0.5, color: Wc });
+    p.drawText(`Additional notes · page ${n} of ${pages}${t.caseNumber ? ` · Complaint # ${t.caseNumber}` : ``} · PIN ${k(t.pin)}`, { x: 36, y: 36, size: 8, font: i, color: Uc });
   }
 }
 /* ---------- Appellant's requested value (manual entry; MV <-> AV at the listed class's LOA) ---------- */
@@ -21902,8 +21897,8 @@ function CrReportButtons({ sheet: e, result: t, summary: n }) {
     [a, o] = (0, C.useState)(``);
   return (0, $.jsxs)($.Fragment, { children: [
     (0, $.jsx)(`button`, {
-      type: `button`, className: `btn`, "data-cr": `il-form`, disabled: r || !t,
-      title: `Illinois PTAB Board of Review notes on appeal (PTAB-6C / PTAB-6I) filled from this case. Saves as ${crPdfBase(e)}.pdf`,
+      type: `button`, className: `btn btn-primary`, "data-cr": `il-form`, disabled: r || !t,
+      title: `Illinois PTAB notes on appeal (PTAB-6C / PTAB-6I) filled from this case, plus Additional Notes pages. Saves as ${crPdfBase(e)}.pdf`,
       onClick: async () => {
         i(!0), o(``);
         try { await crNotesOnAppeal(e, t, n); o(`pdf`); } catch (e) { o(e instanceof Error ? e.message : `The form could not be filled.`); } finally { i(!1); }
@@ -22443,15 +22438,15 @@ function Qu() {
               children: [
                 (0, $.jsx)(`p`, {
                   className: `text-xs font-medium tracking-wide text-muted uppercase`,
-                  children: `Cook County Board of Review`,
+                  children: `Cap & Review`,
                 }),
                 (0, $.jsx)(`h1`, {
                   className: `mt-1 font-display text-4xl leading-none text-balance text-fg`,
-                  children: `2026 COMMERCIAL REVIEWS`,
+                  children: `2026 Commercial Reviews`,
                 }),
                 (0, $.jsx)(`p`, {
                   className: `mt-2 max-w-xl text-sm text-pretty text-muted`,
-                  children: `Income approach, loaded cap rate, 2026 Assessor method. Enter the docket and PIN (or click a property on the Experience Builder map); the case fills from the Assessor data, then pick comps and print the review worksheet.`,
+                  children: `Income approach, loaded cap rate, 2026 Assessor method. Enter the docket and PIN; the case fills from the Assessor data, then pick comps and print the review worksheet.`,
                 }),
               ],
             }),
@@ -22508,14 +22503,7 @@ function Qu() {
                 (0, $.jsxs)(`p`, {
                   className: `text-xs text-pretty text-subtle`,
                   children: [
-                    `Every case is saved in this browser. Switch cases here. A click on the `,
-                    (0, $.jsx)(`a`, {
-                      href: jl,
-                      target: `_blank`,
-                      rel: `noreferrer`,
-                      children: `Chicago commercial`,
-                    }),
-                    ` map opens or creates the case for that PIN when this page is its Embed widget.`,
+                    `Every case is saved in this browser. Switch cases here.`,
                   ],
                 }),
               ],

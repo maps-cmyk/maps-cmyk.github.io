@@ -280,3 +280,5 @@ main{max-width:100%;overflow-x:clip}
 .cr-grid tr.is-m td{background:#f2ecfb}
 .cr-grid tfoot td{background:var(--p-fill);font-weight:700;border-top:2px solid var(--p-line)}
 @media print{.cr-grid thead{display:table-header-group}.cr-grid tr{break-inside:avoid}.cr-grid-wrap{overflow:visible}}
+.btn-primary{background:var(--color-accent,#c9a227);color:#14160f;border-color:var(--color-accent,#c9a227);font-weight:600}
+.btn-primary:not(:disabled):hover{filter:brightness(1.06)}

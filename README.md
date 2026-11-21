@@ -1,6 +1,6 @@
 # 2026 COMMERCIAL REVIEWS
 
-Cook County Board of Review commercial review tool: income worksheet (loaded cap rate, 2026 Assessor method) and sales comps map. It has two outputs: the **PTAB PDF (State Form)** and the **Analyst Report**. It is a fork of the Grok-hosted "Income Approach" app (https://zephyr-ocean-brush-delta.grok.me/) with the same calculations and look.
+Cap & Review | 2026 Commercial Reviews: income worksheet (loaded cap rate, 2026 Assessor method) and sales comps map. It has two outputs: the **PTAB PDF (State Form)** and the **Analyst Report**. It is a fork of the Grok-hosted "Income Approach" app (https://zephyr-ocean-brush-delta.grok.me/) with the same calculations and look.
 
 ## What's here
 
@@ -45,9 +45,9 @@ The top of the page is the entry point:
 4. *(Optional)* **Load the Commercial Review Extract CSV**. It stays in this browser (IndexedDB) and is never uploaded. Typing a docket number or PIN then also fills complaint status, requested value and the other BOR docket fields.
 5. Make the report: **PTAB PDF (State Form)** or **Analyst Report** (see Reports). There are no CSV/JSON exports, no "Reviewed" flag, and no separate copy-worksheet or print-worksheet buttons; the two reports are the only outputs. Cases are still saved in this browser.
 
-## Experience Builder (optional prefill)
+## URL prefill (optional)
 
-In the Experience Builder app, add an **Embed** widget, choose **By URL**, and connect it to the Commercial Review Extract layer's data source. Insert attributes with `{field}` placeholders. Minimum:
+The app still accepts URL query and hash parameters (and `postMessage`) to prefill a case. There is no on-screen Experience Builder help panel. If you embed the tool, use `{field}` placeholders. Minimum:
 
 ```
 https://YOUR-HOST/?pin14={pin14}&case_number={BOR_PTAB_Docket_ID}
@@ -111,7 +111,7 @@ The Analyst Report and the on-screen PIN thumbnails load the Assessor file direc
 
 ## Reports
 The two outputs. The buttons are in the Case panel and the Reports section:
-- **PTAB PDF (State Form)**: the official Illinois PTAB notes on appeal (PTAB-6C commercial or PTAB-6I industrial), filled with pdf-lib. It fills from the case: subject, PTAB docket and appellant when known, the checked sales grid (up to 9, analyst-entered comps included and labeled), and the exhibit page. A "Board of Review notes on appeal" page with the analyst's comments, requested value and analyst-entered comps is added when there are any. It downloads as a PDF.
+- **PTAB PDF (State Form)**: the official Illinois PTAB notes on appeal (PTAB-6C commercial or PTAB-6I industrial), filled with pdf-lib. It fills from the case: subject, PTAB docket and appellant when known, the checked sales grid (up to 9, analyst-entered comps included and labeled), and the exhibit page. A "Notes on appeal" page with the analyst's comments, requested value and analyst-entered comps is added when there are any, followed by blank Additional Notes pages (the same count as the Analyst Report, default 2). It downloads as a PDF.
 - **Analyst Report**: the five-page Commercial Review Worksheet, printed from the browser (letter size; use Save as PDF). Page 3 is a **Comparable Sales Grid** modeled on the PTAB-6C/6I comparable-sales section. It lists the subject first, then each checked comp (auto and analyst-entered) with Source, PIN, address, proximity (mi), sale date, sale price, building sf, land sf, $/sf, class, and year built / age. Land sf and year built come from `csik-bsws` when available. An Avg row and the average $/sf and average price close the grid. Long lists continue on the next sheet with the header repeated. It includes the comment boxes and 0 to 5 blank lined "Additional Notes" pages (default 2). Each notes page has the complaint #, PIN, and analyst in its header.
 
 Both are named `<docket>_<PIN>.pdf` (for example `2022-77-16242_17204390020000.pdf`). The PTAB download uses that name directly; the Analyst Report sets the page title so the browser's Save as PDF suggests it. Characters that aren't allowed in file names are replaced.
@@ -133,10 +133,10 @@ The extract CSV and URL parameters can prefill these fields, but only when both 
 
 Where the values appear:
 - **Analyst Report:** the Requested MV and Requested AV boxes, plus "VS REQUEST" (new AV minus requested AV).
-- **PTAB PDF (State Form):** the official form has no requested-value field, so the value goes on the added "Board of Review notes on appeal" page.
+- **PTAB PDF (State Form):** the official form has no requested-value field, so the value goes on the added "Notes on appeal" page.
 
-## Side panel (Experience Builder Embed widget)
-The page is built to sit in a narrow Embed widget (about 320–480 px wide). Below 640 px it becomes one column: the required case inputs come first, then collapsible **Case**, **Sales map & comps**, **Income**, and **Reports** sections. Tap a section header to open or close it; the state is remembered in this browser. The sales map is about 280 px tall, comps are cards, controls are at least 44 px tall, and wide tables scroll inside their own box, so the page never scrolls sideways. Both reports still print and download as full letter pages.
+## Side panel
+The page is built to sit in a narrow side panel (about 320–480 px wide). Below 640 px it becomes one column: the required case inputs come first, then collapsible **Case**, **Sales map & comps**, **Income**, and **Reports** sections. Tap a section header to open or close it; the state is remembered in this browser. The sales map is about 280 px tall, comps are cards, controls are at least 44 px tall, and wide tables scroll inside their own box, so the page never scrolls sideways. Both reports still print and download as full letter pages.
 
 Embed widget iframe needs. If you set a `sandbox` attribute, or your host adds one, allow:
 - `allow-scripts allow-same-origin`: the app, the saved cases (localStorage/IndexedDB), and the open data lookups.
