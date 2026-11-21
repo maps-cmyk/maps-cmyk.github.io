@@ -17476,7 +17476,7 @@ async function Jc(e, t, n, r) {
   let i = t.comps.slice(0, 4),
     [a, o] = await Promise.all([
       $c([t.subject, ...t.comps]),
-      Promise.all([t.subject, ...i].map((e) => el(e))),
+      ((crPhotoDeadline = Date.now() + 3000), Promise.all([t.subject, ...i].map((e) => el(e)))),
     ]);
   await Yc(e, t, n, r, a, o, i);
 }
@@ -17761,7 +17761,7 @@ async function $c(e) {
 }
 async function el(e) {
   try {
-    let r = await crRaceTimeout(crPinPhotoBytes(e), 6000);
+    let r = await crRaceTimeout(crPinPhotoBytes(e), Math.max(200, (crPhotoDeadline || Date.now() + 3000) - Date.now()));
     return r && r.bytes ? r : { bytes: null, source: null };
   } catch {
     return { bytes: null, source: null };
@@ -20544,6 +20544,9 @@ function CrCasePanel({ sheet: e, sheets: t, patch: n, onLookup: r, onExtract: x,
   (0, C.useEffect)(() => {
     o && e.lookup?.pin14 === o && r && r(o);
   }, [e.id]);
+  (0, C.useEffect)(() => {
+    o && crPreloadPinPhotos({ pin: o, lat: e.lat, lng: e.lng });
+  }, [o, e.lat, e.lng]);
   function g(t) {
     n({ caseNumber: t });
     let r = crFindExtract(``, t);
@@ -20776,7 +20779,13 @@ function crSavedPicks(e, t) {
 }
 /* Property photos: first Assessor building picture (_AA on the PIN page); Esri aerial only when that photo is missing (vacant land, 404, or load failure). */
 var CR_PHOTO_MS = 8000,
-  crPhotoCache = new Map();
+  CR_PTAB_PHOTO_BUDGET_MS = 3000,
+  crPhotoCache = new Map(),
+  crAssessorBytes = new Map(),
+  crAssessorInflight = new Map(),
+  crAerialBytes = new Map(),
+  crAerialInflight = new Map(),
+  crPhotoDeadline = 0;
 function crAssessorPhotoUrls(e) {
   let t = crPin14(e);
   if (!t) return [];
@@ -20796,6 +20805,9 @@ function crPhotoRec(e) {
   if (e != null && typeof e == `object`)
     return { pin: crPin14(e.pin ?? e.keypin ?? ``), lat: e.lat, lng: e.lng };
   return { pin: crPin14(e), lat: void 0, lng: void 0 };
+}
+function crAerialKey(e, t) {
+  return e != null && t != null ? `${Number(e).toFixed(6)},${Number(t).toFixed(6)}` : ``;
 }
 async function crFetchBytes(e, t = CR_PHOTO_MS) {
   let n = new AbortController(),
@@ -20832,22 +20844,98 @@ function crProbeUrl(e, t = CR_PHOTO_MS) {
 function crRaceTimeout(e, t) {
   return Promise.race([e, new Promise((e) => setTimeout(() => e(null), t))]);
 }
+var crAssessorUrlCache = new Map();
 async function crFirstAssessorUrl(e) {
-  let t = crAssessorPhotoUrls(e);
-  if (!t.length) return null;
-  let n = await crRaceTimeout(Promise.all(t.map((e) => crProbeUrl(e, 6000))), CR_PHOTO_MS);
-  return (n && n.find(Boolean)) || null;
+  let t = crPin14(e),
+    n = crAssessorPhotoUrls(e);
+  if (!t || !n.length) return null;
+  if (crAssessorUrlCache.has(t)) return crAssessorUrlCache.get(t);
+  let r = await crRaceTimeout(Promise.all(n.map((e) => crProbeUrl(e, 6000))), CR_PHOTO_MS),
+    i = (r && r.find(Boolean)) || null;
+  if (i) crAssessorUrlCache.set(t, i);
+  return i;
 }
-/* PDF embed needs CORS-readable bytes. The Assessor CDN has no CORS, and public proxies are unreliable, so the PTAB form uses the Esri aerial (CORS-enabled, hard timeout). The Analyst Report and UI still show Assessor building photos via <img>. */
+/* The Assessor CDN has no CORS. An already-loaded <img> taints a canvas (SecurityError), so we cannot copy those pixels into the PTAB PDF. Public proxies we tried: images.weserv.nl (origin 403), corsproxy.io (API key required), allorigins (slow/unreliable). imagecdn.app returns CORS JPEGs quickly; format=jpg is required so Chrome does not get WebP. Rate limit is 30/min per client, so we preload only the subject and checked comps, cache verified bytes, and fall back to the Esri aerial. */
+function crAssessorProxyUrl(e) {
+  return `https://imagecdn.app/v2/image/${encodeURIComponent(e)}?format=jpg`;
+}
+function crFetchAssessorBytes(e) {
+  let t = crPin14(e);
+  if (!t) return Promise.resolve(null);
+  if (crAssessorBytes.has(t)) return Promise.resolve(crAssessorBytes.get(t));
+  if (crAssessorInflight.has(t)) return crAssessorInflight.get(t);
+  let n = (async () => {
+    try {
+      let e = await crFirstAssessorUrl(t);
+      if (!e) {
+        let n = { bytes: null, source: null, none: !0 };
+        crAssessorBytes.set(t, n);
+        return n;
+      }
+      let r = await crFetchBytes(crAssessorProxyUrl(e), 4000);
+      if (r) {
+        let n = { bytes: r, source: `assessor` };
+        crAssessorBytes.set(t, n);
+        return n;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      crAssessorInflight.delete(t);
+    }
+  })();
+  crAssessorInflight.set(t, n);
+  return n;
+}
+function crFetchAerialBytes(e) {
+  let t = crAerialKey(e.lat, e.lng);
+  if (!t) return Promise.resolve({ bytes: null, source: null });
+  if (crAerialBytes.has(t)) return Promise.resolve(crAerialBytes.get(t));
+  if (crAerialInflight.has(t)) return crAerialInflight.get(t);
+  let n = (async () => {
+    try {
+      let n = crAerial(e.lat, e.lng);
+      if (!n) return { bytes: null, source: null };
+      let r = await crFetchBytes(n, 5000);
+      let i = r ? { bytes: r, source: `aerial` } : { bytes: null, source: null };
+      if (i.bytes) crAerialBytes.set(t, i);
+      return i;
+    } catch {
+      return { bytes: null, source: null };
+    } finally {
+      crAerialInflight.delete(t);
+    }
+  })();
+  crAerialInflight.set(t, n);
+  return n;
+}
+function crPreloadPinPhotos(e) {
+  let t = crPhotoRec(e);
+  if (t.pin) void crFetchAssessorBytes(t.pin);
+  if (t.lat != null && t.lng != null) void crFetchAerialBytes(t);
+}
+function crPreloadCasePhotos(e, t) {
+  crPreloadPinPhotos(e);
+  for (let n of t || []) crPreloadPinPhotos(n);
+}
 async function crPinPhotoBytes(e) {
   try {
-    let { lat: n, lng: r } = crPhotoRec(e);
-    if (n != null && r != null) {
-      let i = crAerial(n, r);
-      if (i) {
-        let a = await crFetchBytes(i, 5000);
-        if (a) return { bytes: a, source: `aerial` };
-      }
+    let t = crPhotoRec(e),
+      n = t.pin && crAssessorBytes.get(t.pin);
+    if (n && n.bytes && crIsImageBytes(n.bytes)) return n;
+    let r = crPhotoDeadline ? Math.max(0, crPhotoDeadline - Date.now()) : CR_PTAB_PHOTO_BUDGET_MS;
+    if (t.pin && r > 0 && !(n && n.none)) {
+      let e = await crRaceTimeout(crFetchAssessorBytes(t.pin), r);
+      if (e && e.bytes && crIsImageBytes(e.bytes)) return e;
+    }
+    let i = crAerialKey(t.lat, t.lng),
+      a = i && crAerialBytes.get(i);
+    if (a && a.bytes) return a;
+    let o = crPhotoDeadline ? Math.max(0, crPhotoDeadline - Date.now()) : 800;
+    if (o > 0) {
+      let e = await crRaceTimeout(crFetchAerialBytes(t), o);
+      if (e && e.bytes) return e;
     }
   } catch {}
   return { bytes: null, source: null };
@@ -21222,7 +21310,11 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
     _ = i.a.sales ?? [],
     v = i.peers,
     y = v?.valueSf?.length ? crHist(v.valueSf, i.valueSf) : null,
-    z9 = 0;
+    z9 = 0,
+    pk = `${A(e.pin)}|${(i.comps || []).map((e) => A(e.pin)).join(`,`)}|${e.lat}|${e.lng}`;
+  (0, C.useEffect)(() => {
+    crPreloadCasePhotos({ pin: e.pin, lat: e.lat ?? s?.lat, lng: e.lng ?? s?.lng }, i.comps);
+  }, [pk]);
   return (0, $.jsxs)(`section`, {
     className: `cr-report mt-8`, "data-cr": `analysis-report`,
     children: [
