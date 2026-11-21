@@ -17815,17 +17815,11 @@ function sl(e, t, n) {
   return `commercial`;
 }
 function cl(e) {
-  return e === `industrial`
-    ? {
-        file: `./forms/PTAB6I.pdf`,
-        label: `PTAB-6I industrial`,
-        blank: `https://ptab.illinois.gov/PDF/PTAB6I.pdf`,
-      }
-    : {
-        file: `./forms/PTAB6C.pdf`,
-        label: `PTAB-6C commercial`,
-        blank: `https://ptab.illinois.gov/PDF/PTAB6C.pdf`,
-      };
+  return {
+    file: `./forms/PTAB6C.pdf`,
+    label: `PTAB-6C commercial`,
+    blank: `https://ptab.illinois.gov/PDF/PTAB6C.pdf`,
+  };
 }
 async function ll(e, t, n, r) {
   let i = await Dc.load(e),
@@ -17843,6 +17837,7 @@ async function ll(e, t, n, r) {
     s(`County`, `Cook`),
     s(`Property Tax Appeal Board Docket No`, t.docket || ``),
     s(`Appellant`, t.appellant || ``),
+    crFillPtabExtras(s, a, t),
     s(`Parcel Address`, t.address),
     s(`Property ID No PIN`, fl(t.pin)),
     s(`Township`, t.township),
@@ -17865,12 +17860,14 @@ async function ll(e, t, n, r) {
       dl(s, `Comp ${n + 1}`, e, hl(t.subject, e));
     }),
     a.acroForm.dict.set(q.of(`NeedAppearances`), rr.True),
+    await crValuationPdfPages(i, t, n, r),
     await Jc(i, t, n, r),
     await crNotesPdfPages(i, t),
+    i.setTitle(`${crPtabPdfBase({ pin: t.pin })}.pdf`),
     i.save()
   );
 }
-async function ul(e, t, n) {
+async function ul(e, t, n, w) {
   let r = cl(e.kind),
     i = await fetch(r.file);
   if (!i.ok) throw Error(`The PTAB form did not load.`);
@@ -17878,28 +17875,11 @@ async function ul(e, t, n) {
     o = new Blob([a.buffer.slice(a.byteOffset, a.byteOffset + a.byteLength)], {
       type: `application/pdf`,
     }),
-    s = URL.createObjectURL(o),
-    c = document.createElement(`a`),
-    l = e.pin.replace(/\D/g, ``).padStart(14, `0`).slice(-14);
-  ((c.href = s),
-    (c.download = `${crPdfBase()}.pdf`),
-    crKeepPdf(s, c.download),
-    document.body.appendChild(c),
-    c.click(),
-    c.remove());
+    s = URL.createObjectURL(o);
+  crPresentPdf(s, `${crPtabPdfBase({ pin: e.pin })}.pdf`, w);
 }
 function dl(e, t, n, r) {
-  let i = n.salePrice > 0 && n.nra > 0 ? n.salePrice / n.nra : 0;
-  (e(`${t}Property Index Number PIN`, fl(n.pin)),
-    e(`${t}Address`, n.address),
-    e(`${t}Proximity to Subject`, r),
-    e(`${t}Cook County Assessment Class`, n.classCode),
-    e(`${t}Cook County Volume Assessment Class`, n.classCode),
-    e(`${t}Total Building Sq Ft`, pl(n.nra)),
-    e(`${t}Date of Sale`, ml(n.saleDate)),
-    e(`${t}Sales Price`, pl(n.salePrice)),
-    e(`${t}${ol}`, i > 0 ? j(i, 2) : ``),
-    e(`${t}Total Assessment`, pl(n.totalAv)));
+  crFillGridRow(e, t, n, r);
 }
 function fl(e) {
   return k(e);
@@ -18490,7 +18470,7 @@ function au(e) {
 function ou() {
   let e = new Date();
   return (
-    e.setFullYear(e.getFullYear() - 3),
+    e.setFullYear(e.getFullYear() - (typeof CR_SALE_YEARS === `number` ? CR_SALE_YEARS : 2)),
     `${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, `0`)}-${String(e.getDate()).padStart(2, `0`)}T00:00:00`
   );
 }
@@ -18517,10 +18497,11 @@ async function uu(e, t) {
       `sale_filter_less_than_10k=false`,
       `sale_filter_deed_type=false`,
       `sale_filter_same_sale_within_365=false`,
+      `is_multisale=false`,
       e,
     ].join(` AND `),
     r = new URLSearchParams({
-      $select: `pin,class,sale_date,sale_price`,
+      $select: `pin,class,sale_date,sale_price,deed_type,is_multisale`,
       $where: n,
       $order: `sale_date DESC`,
       $limit: String(t),
@@ -18537,7 +18518,7 @@ async function uu(e, t) {
     t.length < 10 ||
       !(r > 1e4) ||
       !(n > 0) ||
-      o.push({ pin: t, classCode: Il(e.class), salePrice: r, saleDate: n });
+      o.push({ pin: t, classCode: Il(e.class), salePrice: r, saleDate: n, deedType: Il(e.deed_type), is_multisale: e.is_multisale === !0 || e.is_multisale === `true` });
   }
   return o;
 }
@@ -19001,7 +18982,7 @@ function Du({
       if (r !== ge.current) return;
       let n = e.filter((e) => e.keypin !== c.keypin);
       (w(n),
-        ae(crSavedPicks(c, n) ?? new Set(n.filter((e) => ju(e.saleDate, l)).map(Au))),
+        ae(crDefaultPicks(c, n)),
         E(t),
         se(`idle`));
     } catch {
@@ -19103,7 +19084,7 @@ function Du({
               }),
               (0, $.jsx)(`p`, {
                 className: `mt-1 max-w-xl text-sm text-pretty text-muted`,
-                children: `The case PIN is the red subject. Sales within ${CR_RADIUS_MI} miles from the last three years are listed nearest first. Search below for any other PIN or address.`,
+                children: `The case PIN is the red subject. Sales within ${CR_RADIUS_MI} miles from the last ${CR_SALE_YEARS} years are listed; the ${CR_AUTO_COMPS} best comps are auto-selected. Search below for any other PIN or address.`,
               }),
             ],
           }),
@@ -19300,7 +19281,7 @@ function Du({
                           [A.classCode, A.use, eu(A.nra), A.township]
                             .filter(Boolean)
                             .join(` · `),
-                          `. Same class and a nearby size, sold within the last three years, within ${CR_RADIUS_MI} miles of the subject, and matched to the latest commercial valuation. Distances are straight-line miles from the subject; nearest is listed first. Sales from the year before January 1, `,
+                          `. Same or similar class first, then closeness in building size, distance, and sale recency. Sales from the last ${CR_SALE_YEARS} years within ${CR_RADIUS_MI} miles are listed; the ${CR_AUTO_COMPS} best are auto-checked. Analysts may check or uncheck others or add a manual comp. Distances are straight-line miles from the subject. Sales from the year before January 1, `,
                           me,
                           ` are checked. Check a sale to include it in the sales approach, which is separate from the income worksheet.`,
                         ],
@@ -19624,12 +19605,18 @@ function Lu(e, t, n, r, i, a) {
   };
 }
 function Ru(e, t = e.nra, n = e.boardAv || e.mailedAv) {
+  let x = (typeof crCompExtraOf == `function` && crCompExtraOf(e.keypin || e.pin)) || {};
   return {
     pin: e.keypin || e.pin,
     address: e.manual ? `${e.address} (${CR_MANUAL_LABEL})` : e.address,
     township: e.township,
     classCode: e.classCode,
-    nra: t,
+    nra: t || x.bldgSf || 0,
+    landSf: e.landSf || x.landSf || 0,
+    yearBuilt: e.yearBuilt || x.yearBuilt || 0,
+    units: e.units || 0,
+    landAv: e.landAv || 0,
+    bldgAv: e.bldgAv || 0,
     saleDate: e.saleDate,
     salePrice: e.salePrice,
     totalAv: n,
@@ -19819,7 +19806,7 @@ function Wu(e, t) {
     (e, n) => (Ku(t, e) ?? 1e9) - (Ku(t, n) ?? 1e9) || (n.saleDate ?? 0) - (e.saleDate ?? 0),
   );
   return n.length
-    ? [{ tier: `Within ${CR_RADIUS_MI} miles · sold in the last 3 years · nearest first`, classCode: ``, rows: n }]
+    ? [{ tier: `Within ${CR_RADIUS_MI} miles · sold in the last 2 years · 4 best auto-selected`, classCode: ``, rows: n }]
     : [];
 }
 function Gu({ comp: e, subject: t, used: n, onToggle: r, onApply: i, onEdit: mE, onDelete: mD }) {
@@ -20226,8 +20213,8 @@ var CR_COMMENTS = [
    Everything prefixed "cr" was added for the 2026 COMMERCIAL REVIEWS fork.
    - Subject harvest from Experience Builder (URL query/hash params + postMessage)
    - Case panel (PIN / case number / analyst), read-only subject panel
-   - Comps: last 3 years, within 15 miles, sorted by distance (see iu / Wu)
-   - Two outputs only: PTAB PDF (State Form) and the Analyst Report (both <docket>_<PIN>.pdf)
+   - Comps: last 2 years, within 15 miles; 4 best auto-checked (class, size, distance, recency)
+   - Two outputs: PTAB PDF (State Form) as <PIN14>_PTAB.pdf, Analyst Report as <docket>_<PIN>.pdf
 ============================================================================== */
 var CR_FIELDS = ["Document_Name", "BOR_Filing_Year", "BOR_PTAB_Docket_ID", "BOR_PIN", "BOR_Property_Class", "BOR_PTAB_Status", "BOR_PTAB_Property_Type", "BOR_Property_Type", "BOR_PTAB_Number", "BOR_PTAB_Appellant_FN", "BOR_PTAB_Appellant_LN", "BOR_Attorney_Code", "BOR_Attorney_LN", "BOR_Attorney_FN", "BOR_Attorney_Firm", "BOR_PTAB_Letter_Date", "BOR_PTAB_Deadline_Date", "BOR_PTAB_Orig_Deadline_Date", "BOR_Township", "BOR_PTAB_Docket_ID_Rel", "BOR_Township_Num", "BOR_Land_AV", "BOR_Improvement_AV", "BOR_Total_AV", "BOR_Prior_Land_Value", "BOR_Prior_Cost_of_Improvements", "BOR_Prior_AV", "BOR_PTAB_Valuation_Req", "BOR_Complaint_Num", "BOR_PTAB_Analyst", "BOR_Current_Commissioner_Group", "BOR_PTAB_Evidence", "BOR_PTAB_Hearing_Requested", "BOR_PTAB_Formal_Hearing_Date", "BOR_PTAB_Formal_Hearing_Time", "BOR_PTAB_Withdrawal_Approved", "BOR_PTAB_IL_PTAB_Docket_ID", "BOR_PTAB_Notes_Sent", "BOR_PTAB_Stip_or_WD_Exist", "BOR_Queue_Name", "BOR_Description", "BOR_PTAB_Default", "BOR_PTAB_Trans_Code", "BOR_PTAB_Rebuttal", "BOR_PTAB_Ev_Appraisal", "BOR_PTAB_Ev_Assmt_Equity", "BOR_PTAB_Ev_Comp_Sales", "BOR_PTAB_Ev_Contention_Law", "BOR_PTAB_Ev_Recent_Constr", "BOR_PTAB_Ev_Recent_Sale", "BOR_PTAB_Appellant_Hrg_Req", "BOR_Current_MV", "BOR_Current_MV_Sq_Ft", "BOR_Property_Address", "BOR_Property_City", "BOR_Requested_AV", "BOR_Sq_Ft_Building", "BOR_Sq_Ft_Land", "BOR_Total_Value", "BOR_Vacancy_Pct", "BOR_PTAB_PIN_Count", "BOR_PTAB_Recent_Sale", "BOR_PTAB_Comparable_Sales", "BOR_PTAB_Contention_of_Law", "BOR_PTAB_Recent_Appraisal", "BOR_PTAB_Recent_Construction", "BOR_PTAB_Assessment_Equity", "BOR_PTAB_Property_Class", "BOR_PTAB_Notes_Stip", "BOR_PTAB_Notes_Stip_Impr", "BOR_PTAB_Notes_Stip_Land", "BOR_PTAB_Notes_Stip_Total", "BOR_PTAB_Rollover_PTAB", "BOR_PTAB_Direct_Appeal_PTAB", "BOR_PTAB_Rollover_BOR", "BOR_PTAB_Notes_Verified", "Add_Back_to_WF", "pin14", "pin10", "pin_dashed", "pin_flag", "lat", "lon", "matched_address", "match_method", "point_count", "matched_pin", "match_source", "inc_match_method", "inc_is_keypin", "inc_pin_role", "inc_pin_count", "inc_matched_pin", "inc_keypin", "inc_keypin_d", "inc_pins", "inc_year", "inc_year_n", "inc_tiebreak", "inc_alt_uses", "inc_use", "inc_township", "inc_townreg", "inc_sheet", "inc_model", "inc_class", "inc_address", "inc_taxpayer", "inc_propname", "inc_proptype", "inc_subclass", "inc_taxdist", "inc_invrate", "inc_nbhd", "inc_bldgsf", "inc_grossba", "inc_landsf", "inc_nrsf", "inc_commsf", "inc_units", "inc_apt", "inc_stories", "inc_yrbuilt", "inc_pgi", "inc_vacancy", "inc_egi", "inc_exp", "inc_totalexp", "inc_noi", "inc_caprate", "inc_incmv", "inc_incmvsf", "inc_fmv", "inc_fmvsf", "inc_fmvunit", "inc_fmvbed", "inc_fmvkey", "inc_landbldg", "inc_exland", "inc_exlandv", "inc_landval", "inc_costsf", "inc_salesf", "inc_parking", "inc_parksf", "inc_occup", "inc_covidvac", "inc_adjrent", "av_match", "av_cur_year", "av_prv_year", "av_cur_stage", "av_cur_class", "av_cur_town", "av_cur_tcode", "av_cur_nbhd", "av_prv_stage", "av_prv_class", "av_cur_land", "av_cur_bldg", "av_cur_tot", "av_cur_hie", "av_cur_mlnd", "av_cur_mbld", "av_cur_mtot", "av_cur_clnd", "av_cur_cbld", "av_cur_ctot", "av_cur_blnd", "av_cur_bbld", "av_cur_btot", "av_prv_land", "av_prv_bldg", "av_prv_tot", "av_prv_hie", "av_yoy_dlt", "av_yoy_pct", "av_m2c_dlt", "av_m2c_pct", "av_c2b_dlt", "av_c2b_pct", "av_m2b_dlt", "av_m2b_pct", "bor_match", "bor_prev_year", "bor_last_year", "bor_prev_n", "bor_tied", "bor_appealid", "bor_appellant", "bor_attorney", "bor_firm", "bor_attycode", "bor_result", "bor_changed", "bor_type", "bor_reason", "bor_class", "bor_majclass", "bor_pre_land", "bor_pre_bldg", "bor_pre_tot", "bor_post_land", "bor_post_bldg", "bor_post_tot", "bor_chg_dlt", "bor_chg_pct", "sale_match", "sale_count", "sale_date", "sale_year", "sale_price", "sale_doc_no", "sale_deed", "sale_mydeed", "sale_seller", "sale_buyer", "sale_type", "sale_multi", "sale_npins", "sale_mydate", "sale_f365", "sale_f10k", "sale_fdeed", "sale_class"],
   CR_FIELD_SET = new Set(CR_FIELDS),
@@ -20235,6 +20222,9 @@ var CR_FIELDS = ["Document_Name", "BOR_Filing_Year", "BOR_PTAB_Docket_ID", "BOR_
   CR_EXTRA_PARAMS = [`pin`, `keypin`, `case_number`, `case`, `analyst`, `lng`, `tax_year`, `tax_code`, `requested_av`, `requested_mv`],
   CR_ANALYST_KEY = `cr2026-analyst`,
   CR_RADIUS_MI = 15,
+  CR_SALE_YEARS = 2,
+  CR_AUTO_COMPS = 4,
+  crAutoPickInfo = [],
   crPending = null,
   crHarvestLoc = null,
   crStateRef = null,
@@ -20776,6 +20766,103 @@ function crSavedPicks(e, t) {
   let r = new Set(n.sales.comps.filter((e) => !e.manual).map((e) => `${crPin14(e.pin)}|${Math.round(e.salePrice || 0)}`)),
     i = t.filter((e) => r.has(`${crPin14(e.keypin || e.pin)}|${Math.round(e.salePrice || 0)}`));
   return i.length ? new Set(i.map(Au)) : null;
+}
+
+function crSaleCutoff(e = CR_SALE_YEARS) {
+  let t = new Date();
+  t.setFullYear(t.getFullYear() - e);
+  return t.getTime();
+}
+function crClassKey(e) {
+  return String(e || ``).split(/[,;]/)[0].replace(/\D/g, ``).slice(0, 3);
+}
+function crClassTier(e, t) {
+  let n = crClassKey(e),
+    r = crClassKey(t);
+  if (!n || !r) return 3;
+  return n === r ? 0 : n.slice(0, 2) === r.slice(0, 2) ? 1 : n[0] === r[0] ? 2 : 3;
+}
+function crClassTierLabel(e) {
+  return [`same class`, `similar class (same 2-digit group)`, `same major class`, `different class`][e] || `class`;
+}
+function crSaleFlagged(e) {
+  if (e.multi === !0 || e.isMultisale === !0 || String(e.is_multisale ?? ``).toLowerCase() === `true`) return `multi-parcel sale`;
+  let t = String(e.deedType || e.deed_type || ``).toUpperCase();
+  if (/QUIT\s*CLAIM|SHERIFF|TAX DEED|FORECLOS|EXECUTOR|BENEFICIAR|DEED IN LIEU/.test(t)) return `deed type ${e.deedType || e.deed_type}`;
+  return null;
+}
+function crAutoPicks(e, t) {
+  crAutoPickInfo = [];
+  let n = e?.nra || 0,
+    r = e?.classCode || ``,
+    i = crSaleCutoff(),
+    a = [];
+  for (let o of t || []) {
+    if (crSaleFlagged(o) || !(o.saleDate >= i) || !(o.salePrice > 0)) continue;
+    if (o.distanceMi != null && o.distanceMi > CR_RADIUS_MI) continue;
+    let s = o.nra || 0,
+      c = o.salePrice > 0 && s > 0 ? o.salePrice / s : null,
+      l = crClassTier(r, o.classCode),
+      u = n > 0 && s > 0 ? Math.min(2, Math.abs(s - n) / n) : 1,
+      d = (o.distanceMi != null ? o.distanceMi : CR_RADIUS_MI) / CR_RADIUS_MI,
+      f = o.saleDate ? (Date.now() - o.saleDate) / 864e5 : CR_SALE_YEARS * 365,
+      p = Math.min(1, Math.max(0, f / (CR_SALE_YEARS * 365)));
+    a.push({ e: o, tier: l, sizeRel: u, nra: s, psf: c, days: f, score: u * 3 + d * 2 + p * 1.5 });
+  }
+  let o = a.map((e) => e.psf).filter((e) => e != null).sort((e, t) => e - t);
+  if (o.length >= 5) {
+    let e = o[Math.floor(o.length / 2)];
+    a = a.filter((t) => t.psf == null || (t.psf <= e * 3 && t.psf >= e / 3));
+  }
+  a.sort((e, t) => e.tier - t.tier || e.score - t.score || (t.e.saleDate || 0) - (e.e.saleDate || 0));
+  let s = a.slice(0, CR_AUTO_COMPS);
+  crAutoPickInfo = s.map((t, i) => ({
+    key: Au(t.e),
+    pin: crPin14(t.e.keypin || t.e.pin),
+    rank: i + 1,
+    why: [
+      crClassTierLabel(t.tier),
+      t.nra > 0 && n > 0 ? `${Math.round(t.nra).toLocaleString()} sf (${Math.round((Math.abs(t.nra - n) / n) * 100)}% size difference)` : t.nra > 0 ? `${Math.round(t.nra).toLocaleString()} sf` : `no building size`,
+      t.e.distanceMi != null ? `${t.e.distanceMi.toFixed(2)} mi` : `distance unknown`,
+      t.e.saleDate ? `sold ${new Date(t.e.saleDate).toLocaleDateString(`en-US`)}` : `no sale date`,
+    ].join(`; `),
+  }));
+  return new Set(s.map((e) => Au(e.e)));
+}
+function crAutoPickRule() {
+  return `Sales are drawn from the last ${CR_SALE_YEARS} years within ${CR_RADIUS_MI} miles. The ${CR_AUTO_COMPS} best comps are auto-selected, scored by same or similar class first, then closeness in building square feet, distance, and sale recency. Multi-parcel sales, non-arm's-length deed types, and extreme $/sf outliers are excluded when flagged. Analysts may check or uncheck other sales and add manual comps.`;
+}
+function crAutoPickDetails() {
+  return crAutoPickInfo.map((e) => `Score ${e.rank}: ${e.pin ? k(e.pin) : ``} — ${e.why}`);
+}
+function crAutoPickNote() {
+  let e = crAutoPickRule(),
+    t = crAutoPickDetails();
+  return t.length ? `${e} Auto-selected: ${t.join(`; `)}.` : e;
+}
+function crIsAutoPick(e) {
+  let t = Au(e),
+    n = crPin14(e.keypin || e.pin);
+  return crAutoPickInfo.some((e) => e.key === t || (n && e.pin === n));
+}
+function crDefaultPicks(e, t) {
+  crAutoPickInfo = [];
+  return crSavedPicks(e, t) ?? crAutoPicks(e, t);
+}
+function crPdfWrap(e, t) {
+  let n = String(e || ``).replace(/\s+/g, ` `).trim(),
+    r = [];
+  while (n.length) {
+    if (n.length <= t) {
+      r.push(n);
+      break;
+    }
+    let i = n.lastIndexOf(` `, t);
+    if (i < t * 0.55) i = t;
+    r.push(n.slice(0, i).trim());
+    n = n.slice(i).trim();
+  }
+  return r;
 }
 /* Property photos: first Assessor building picture (_AA on the PIN page); Esri aerial only when that photo is missing (vacant land, 404, or load failure). */
 var CR_PHOTO_MS = 8000,
@@ -21322,7 +21409,7 @@ function CrReport({ sheet: e, result: t, summary: n, patch: r }) {
         (0, $.jsxs)(`div`, { children: [
           (0, $.jsx)(`p`, { className: `text-xs font-medium tracking-wide text-muted uppercase`, children: `Outputs` }),
           (0, $.jsx)(`h2`, { className: `mt-1 font-display text-2xl leading-none`, children: `Reports` }),
-          (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `PTAB PDF (State Form) is the featured report: the Illinois PTAB notes on appeal (PTAB-6C or PTAB-6I) filled from this case (subject, checked sales including analyst-entered comps, exhibit page, comments, and Additional Notes pages). Analyst Report prints the worksheet below. Both are named <docket>_<PIN>.pdf.` }),
+          (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `PTAB PDF (State Form) is the featured report: the Illinois PTAB notes on appeal (PTAB-6C or PTAB-6I) filled from this case (subject, checked sales including analyst-entered comps, exhibit page, comments, and Additional Notes pages). Analyst Report prints the worksheet below. The PTAB PDF is named <PIN14>_PTAB.pdf; the Analyst Report is named <docket>_<PIN>.pdf.` }),
           (0, $.jsx)(`p`, { className: `mt-1 max-w-xl text-sm text-pretty text-muted`, children: `Analyst Report: five letter pages (including the comparable sales grid) plus Additional Notes pages. Boxes and comment fields are editable and saved with the case; values come from the case, the PIN lookup, and the checked sales. Print to PDF from the browser.` }),
         ] }),
         (0, $.jsxs)(`div`, { className: `flex flex-wrap items-end gap-2`, children: [
@@ -21596,7 +21683,7 @@ function CrCompGrid({ sheet: e, model: t }) {
     h = r.map((e, t) => {
       let n = o(e.pin);
       return {
-        n: t + 1, src: e.manual ? `Analyst-entered` : `Auto`, pin: crPin14(e.pin) ? k(crPin14(e.pin)) : `—`, address: String(e.address || `—`).replace(/\s*\(Analyst-entered\)\s*$/i, ``),
+        n: t + 1, src: e.manual ? `Analyst-entered` : typeof crIsAutoPick == `function` && crIsAutoPick(e) ? `Auto-selected` : `Auto`, pin: crPin14(e.pin) ? k(crPin14(e.pin)) : `—`, address: String(e.address || `—`).replace(/\s*\(Analyst-entered\)\s*$/i, ``),
         mi: e.distanceMi != null ? e.distanceMi.toFixed(2) : `—`, date: d(e.saleDate), price: e.salePrice, bldg: e.nra || n.bldgSf || 0,
         land: e.landSf || n.landSf || 0, psf: e.psf ?? (e.salePrice > 0 && (e.nra || n.bldgSf) ? e.salePrice / (e.nra || n.bldgSf) : null),
         cls: crClsList(e.classCode), yb: crYb(e.yearBuilt || n.yearBuilt, a), m: !!e.manual, dmi: e.distanceMi,
@@ -21630,7 +21717,7 @@ function CrCompGrid({ sheet: e, model: t }) {
       (0, $.jsxs)(`div`, { children: [(0, $.jsx)(`span`, { children: `AVERAGE SALE PRICE PER SQFT` }), (0, $.jsx)(`b`, { children: m(_.psf) })] }),
       (0, $.jsxs)(`div`, { children: [(0, $.jsx)(`span`, { children: `AVERAGE SALE PRICE` }), (0, $.jsx)(`b`, { children: _.price == null ? `—` : j(_.price, 2) })] }),
     ] }),
-    (0, $.jsx)(`p`, { className: `cr-note`, children: `Source: Auto = sale from the Cook County sales and Assessor data, within 3 years and 15 miles; Analyst-entered = added by the analyst (exempt from that screen). Only checked comps are listed.` }),
+    (0, $.jsx)(`p`, { className: `cr-note`, children: `Source: Auto = sale from the Cook County sales and Assessor data, within ${CR_SALE_YEARS} years and ${CR_RADIUS_MI} miles; Analyst-entered = added by the analyst (exempt from that screen). Only checked comps are listed. ${crAutoPickNote()}` }),
   ] });
 }
 /* ---------- Analyst-entered (manual) comparable sales ---------- */
@@ -21659,7 +21746,7 @@ function crManualOutside(e, t) {
   let n = [],
     r = new Date();
   r.setFullYear(r.getFullYear() - 3);
-  e.saleDate != null && e.saleDate < r.getTime() && n.push(`sold more than 3 years ago`);
+  e.saleDate != null && e.saleDate < r.getTime() && n.push(`sold more than 2 years ago`);
   t != null && t > CR_RADIUS_MI && n.push(`${t.toFixed(2)} mi away (over ${CR_RADIUS_MI})`);
   e.lat == null && n.push(`no location, so no distance`);
   return n;
@@ -21867,10 +21954,12 @@ function crBorFromSheet(e) {
   };
 }
 var CR_EMPTY_SALES = { concluded: null, indicated: null, avgPrice: null, avgPsf: null, avgCap: null, avgVacancy: null, count: 0, area: 0 };
-async function crNotesOnAppeal(e, t, n) {
+async function crNotesOnAppeal(e, t, n, w) {
   crWarnMissing(e);
-  let r = n ? n.bor : crBorFromSheet(e);
-  return ul(crBorExtra(r, e), { ...sd(e, t), caseNumber: e.caseNumber || A(e.pin) }, n ? Uu(n) : CR_EMPTY_SALES);
+  let r = n ? n.bor : crBorFromSheet(e),
+    i = [e.pin, ...(r.comps || []).map((e) => e.pin), ...(n?.picked || []).map((e) => e.pin)];
+  await crCompEnrichWait(i);
+  return ul(crBorExtra(r, e), { ...sd(e, t), caseNumber: e.caseNumber || A(e.pin) }, n ? Uu(n) : CR_EMPTY_SALES, w);
 }
 /* Extra pages on the IL form: comments, analyst-entered comps, and blank Additional Notes pages. */
 async function crNotesPdfPages(e, t) {
@@ -21990,10 +22079,15 @@ function CrReportButtons({ sheet: e, result: t, summary: n }) {
   return (0, $.jsxs)($.Fragment, { children: [
     (0, $.jsx)(`button`, {
       type: `button`, className: `btn btn-primary`, "data-cr": `il-form`, disabled: r || !t,
-      title: `Illinois PTAB notes on appeal (PTAB-6C / PTAB-6I) filled from this case, plus Additional Notes pages. Saves as ${crPdfBase(e)}.pdf`,
+      title: `Opens the filled Illinois PTAB-6C notes on appeal, with a full valuation report, named ${crPtabPdfBase(e)}.pdf`,
       onClick: async () => {
         i(!0), o(``);
-        try { await crNotesOnAppeal(e, t, n); o(`pdf`); } catch (e) { o(e instanceof Error ? e.message : `The form could not be filled.`); } finally { i(!1); }
+        let w = null;
+        try { w = window.open(`about:blank`, `cr-ptab-pdf`); } catch {}
+        try { await crNotesOnAppeal(e, t, n, w); o(`pdf`); } catch (e) {
+          try { w && !w.closed && w.close(); } catch {}
+          o(e instanceof Error ? e.message : `The form could not be filled.`);
+        } finally { i(!1); }
       },
       children: r ? `Preparing…` : `PTAB PDF (State Form)`,
     }),
@@ -22005,18 +22099,359 @@ function CrReportButtons({ sheet: e, result: t, summary: n }) {
     }),
     a === `pdf` && crLastPdf
       ? (0, $.jsxs)(`span`, { className: `text-xs text-subtle`, "data-cr": `pdf-fallback`, children: [
-          `Saved as ${crLastPdf.name}. Nothing downloaded? `,
-          (0, $.jsx)(`a`, { className: `underline`, href: crLastPdf.url, target: `_blank`, rel: `noopener`, children: `Open the PDF in a new tab` }),
+          `Saved as ${crLastPdf.name}. Nothing opened? `,
+          (0, $.jsx)(`a`, { className: `underline`, href: crLastPdf.url, download: crLastPdf.name, target: `_blank`, rel: `noopener`, children: `Open or download the PDF` }),
         ] })
       : a ? (0, $.jsx)(`span`, { className: `text-xs text-subtle`, children: a }) : null,
   ] });
 }
-/* ---------- PDF names: <docket>_<PIN>.pdf ---------- */
+/* PTAB-6C fill, valuation report pages, and open-in-tab delivery. */
+function crCompExtraOf(e) {
+  return crCompExtra.get(crPin14(e)) ?? {};
+}
+async function crCompEnrichWait(e, t = 4000) {
+  let n = [...new Set((e || []).map(crPin14).filter(Boolean))];
+  if (!n.length) return;
+  if (n.every((e) => crCompExtra.has(e))) return;
+  crCompEnrich(n, () => {});
+  let r = Date.now();
+  while (!n.every((e) => crCompExtra.has(e)) && Date.now() - r < t) await new Promise((e) => setTimeout(e, 50));
+}
+function crLatestAv(e) {
+  return e?.lookup?.av?.[0] || null;
+}
+function crFillGridRow(e, t, n, r) {
+  let i = crCompExtraOf(n.pin),
+    a = n.nra || i.bldgSf || 0,
+    o = n.landSf || i.landSf || 0,
+    s = n.yearBuilt || i.yearBuilt || 0,
+    c = n.salePrice > 0 && a > 0 ? n.salePrice / a : 0,
+    l = n.landAv || 0,
+    u = n.bldgAv || 0,
+    d = s > 1800 ? `${s} (age ${Math.max(0, (Number(n.taxYear) || new Date().getFullYear()) - s)})` : ``,
+    f = o > 0 && a > 0 ? (o / a).toFixed(2) : ``;
+  e(`${t}Property Index Number PIN`, fl(n.pin));
+  e(`${t}Address`, n.address);
+  e(`${t}Proximity to Subject`, r);
+  e(`${t}Cook County Assessment Class`, n.classCode);
+  e(`${t}Cook County Volume Assessment Class`, n.classCode);
+  e(`${t}Total Land Sq Ft`, pl(o));
+  e(`${t}Total Building Sq Ft`, pl(a));
+  e(`${t}Age of Buildings`, d);
+  e(`${t}LandtoBuilding Ratio`, f);
+  n.units > 0 && e(`${t}Number of Apartments`, String(Math.round(n.units)));
+  e(`${t}Date of Sale`, ml(n.saleDate));
+  e(`${t}Sales Price`, pl(n.salePrice));
+  e(`${t}${ol}`, c > 0 ? j(c, 2) : ``);
+  e(`${t}Land Assessment`, pl(l));
+  e(`${t}Improvement Assessment`, pl(u));
+  e(`${t}Total Assessment`, pl(n.totalAv));
+  u > 0 && a > 0 && e(`${t}Impr Assessment per Sq Ft Impr Assessment  Impr Sq Ft`, j(u / a, 2));
+}
+function crSelectPtab(e, t, n) {
+  if (!n) return;
+  try {
+    e.getRadioGroup(t).select(n);
+    return;
+  } catch {}
+  try {
+    n !== `Off` && n !== `no` && e.getCheckBox(t).check();
+  } catch {}
+}
+function crFillPtabExtras(s, form, t) {
+  let n = crActiveSheet() || {},
+    r = crLatestAv(n),
+    i = crCompExtraOf(t.pin || n.pin),
+    a = n.nra || i.bldgSf || t.subject?.nra || 0,
+    o = n.units || t.subject?.units || 0;
+  s(`What is the first year of the General Assessment Cycle for the subject property`, ``);
+  if (r) {
+    s(`Land`, pl(r.mailed_land));
+    s(`Impr_2`, pl(r.mailed_bldg));
+    s(`Total_2`, pl(r.mailed_tot || t.mailedAv));
+    let e = r.board_tot > 0;
+    s(`Land_2`, pl(e ? r.board_land : r.certified_land));
+    s(`Impr_3`, pl(e ? r.board_bldg : r.certified_bldg));
+    s(`Total_3`, pl((e ? r.board_tot : r.certified_tot) || t.afterAv));
+  }
+  let x = Number(n.eqFactor);
+  if (x > 0) {
+    crSelectPtab(form, `Did the township assessor Chief County Assessment Officer andor board of review apply a township equalization factor`, `yes_3`);
+    s(`If yes list the factor and equalized assessment Factor`, de(x, 4));
+  }
+  let pins = n.pins || n.lookup?.income?.pins || t.subject?.pins;
+  if ((Array.isArray(pins) ? pins.length : String(pins || ``).split(/[,;]/).filter(Boolean).length) > 1)
+    crSelectPtab(form, `MultiParcelAppeal`, `On`);
+  if (t.subject) {
+    t.subject.landSf ||= i.landSf;
+    t.subject.yearBuilt ||= i.yearBuilt;
+    t.subject.units ||= o;
+    t.subject.taxYear ||= n.taxYear;
+    if (r) {
+      t.subject.landAv ||= (r.board_tot > 0 ? r.board_land : r.certified_land) || r.mailed_land;
+      t.subject.bldgAv ||= (r.board_tot > 0 ? r.board_bldg : r.certified_bldg) || r.mailed_bldg;
+    }
+  }
+}
+function crPresentPdf(e, t, n) {
+  crKeepPdf(e, t);
+  let r = !1,
+    a = String(t || `PTAB.pdf`).replace(/[<>&"'`]/g, ``);
+  try {
+    if (n && !n.closed) {
+      try {
+        let i = n.document;
+        i.open();
+        i.write(
+          `<!doctype html><html><head><meta charset="utf-8"><title>${a}</title><style>html,body,embed{margin:0;border:0;width:100%;height:100%;background:#404040}</style></head><body><embed type="application/pdf" src="${e}" title="${a}"></body></html>`,
+        );
+        i.close();
+        i.title = a;
+        r = !0;
+      } catch {
+        n.location.replace(e);
+        r = !0;
+        try {
+          n.document.title = a;
+        } catch {}
+      }
+    }
+  } catch {}
+  if (!r) {
+    try {
+      n && !n.closed && n.close();
+    } catch {}
+    let i = null;
+    try {
+      i = window.open(e, `cr-ptab-pdf`);
+    } catch {}
+    if (!i || i.closed) {
+      let a = document.createElement(`a`);
+      ((a.href = e), (a.download = t), (a.target = `_blank`), (a.rel = `noopener`));
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  }
+}
+function crPdfFonts(e, t) {
+  return { r: e, b: t };
+}
+function crNewReportPage(e, t, n, r, i) {
+  let a = e.addPage([612, 792]);
+  a.drawText(`CAP & REVIEW`, { x: 36, y: 758, size: 8, font: t.r, color: Uc });
+  a.drawText(n, { x: 36, y: 738, size: 16, font: t.b, color: Hc });
+  a.drawText(`2026 Commercial Reviews`, { x: 36, y: 722, size: 9, font: t.r, color: Uc });
+  r && a.drawText(rl(r, 110), { x: 36, y: 708, size: 8, font: t.r, color: Hc });
+  i && a.drawText(i, { x: 36, y: 36, size: 8, font: t.r, color: Uc });
+  return a;
+}
+function crKvCol(e, t, n, r, i, a) {
+  let o = r;
+  for (let [s, c] of n) {
+    e.drawText(String(s), { x: t, y: o, size: 8, font: i.r, color: Uc });
+    e.drawText(String(c ?? `—`), { x: t + 168, y: o, size: 8, font: i.b, color: Hc });
+    o -= a || 14;
+  }
+  return o;
+}
+function crSheetMeta(e) {
+  return [e.caseNumber ? `Complaint # ${e.caseNumber}` : ``, e.pin ? `PIN ${k(A(e.pin) || e.pin)}` : ``, e.analyst ? `Analyst ${e.analyst}` : ``, e.address].filter(Boolean).join(`  ·  `);
+}
+async function crValuationPdfPages(e, t, n, r) {
+  let i = await e.embedFont(_c.Helvetica),
+    a = await e.embedFont(_c.HelveticaBold),
+    o = crPdfFonts(i, a),
+    s = crActiveSheet() || {},
+    c = ue(s),
+    l = crSheetMeta({ caseNumber: t.caseNumber || s.caseNumber, pin: t.pin || s.pin, analyst: t.analyst || s.analyst, address: t.address || s.address }),
+    u = crReqCompare(s, c),
+    d = typeof pd == `function` ? pd(s.eqFactor) : s.taxRateYear,
+    f = d && d !== `custom` ? d : s.taxRateYear || ``,
+    p = s.expenseMode === `ratio` ? M(s.expenseRatio, 1) : s.expenseMode === `dollars` ? `lump sum` : `line items`,
+    m = [
+      [`PGI`, j(c.pgi)],
+      [`Vacancy & collection loss`, `${j(c.vacancy)}  (${M(s.vacancyRate, 1)})`],
+      [`Other income`, j(s.otherIncome || 0)],
+      [`EGI`, j(c.egi)],
+      [`Operating expenses`, `${j(c.operatingExpenses)}  (${p}${s.expenseMode === `ratio` ? `` : c.egi ? ` · ${M(c.operatingExpenses / c.egi, 1)} of EGI` : ``})`],
+      [`NOI`, j(c.noi)],
+      [`Unloaded / market cap`, M(s.marketCap, 2)],
+      [`Tax year`, s.taxYear || `—`],
+      [`Equalization factor`, de(s.eqFactor, 4)],
+      [`Level of assessment`, M(s.loa, 0)],
+      [`Tax code`, s.taxCode || `—`],
+      [`District tax rate`, `${M(s.taxRate, 3)}${f ? `  (${f})` : ``}`],
+      [`Tax load (LOA × factor × rate)`, M(c.taxLoad, 2)],
+      [`Loaded cap`, M(c.loadedCap, 2)],
+      [`Indicated market value`, j(c.indicated)],
+      [`Additional land`, j(s.additionalLand || 0)],
+      [`Concluded market value`, j(c.concluded)],
+      [`Indicated / new AV`, j(c.assessed)],
+      [`EAV`, j(c.eav)],
+      [`Requested MV`, s.requestedMv > 0 ? j(s.requestedMv) : `—`],
+      [`Requested AV`, s.requestedAv > 0 ? j(s.requestedAv) : `—`],
+      [`Vs request`, u ? `${u.delta >= 0 ? `+` : `−`}${j(Math.abs(u.delta))} AV (${(Math.abs(u.pct) * 100).toFixed(1)}%)` : `—`],
+    ],
+    h = crNewReportPage(e, o, `Income approach worksheet`, l, `Income calculator metrics  ·  ${t.caseNumber ? `Complaint # ${t.caseNumber}  ·  ` : ``}PIN ${k(t.pin)}`);
+  h.drawText(`Every figure below is taken from the case income calculator.`, { x: 36, y: 690, size: 8, font: i, color: Uc });
+  crKvCol(h, 36, m.slice(0, 12), 672, o, 15);
+  crKvCol(h, 320, m.slice(12), 672, o, 15);
+  if (s.taxRateSource)
+    h.drawText(rl(`Tax rate source: ${s.taxRateSource}`, 100), { x: 36, y: 470, size: 7, font: i, color: Uc });
+  h.drawText(`Income value is NOI ÷ loaded cap, before additional land and rounding to the nearest $1,000.`, { x: 36, y: 454, size: 7, font: i, color: Uc });
+
+  /* Comps grid with averages and $/sf comparison */
+  let g = (t.comps || []).map((e, n) => {
+      let r = crGridExtraRow(e, t.subject);
+      return { n: n + 1, auto: typeof crIsAutoPick == `function` && crIsAutoPick(e), ...r };
+    }),
+    _ = (e, t) => (e.length ? e.reduce((e, t) => e + t, 0) / e.length : null),
+    v = {
+      price: _(g.map((e) => e.price).filter((e) => e > 0)),
+      bldg: _(g.map((e) => e.bldg).filter((e) => e > 0)),
+      land: _(g.map((e) => e.land).filter((e) => e > 0)),
+      psf: _(g.map((e) => e.psf).filter((e) => e != null && Number.isFinite(e))),
+      mi: _(g.map((e) => e.mi).filter((e) => e != null)),
+    },
+    y = c.concluded != null && (s.nra || 0) > 0 ? c.concluded / s.nra : null,
+    b = crNewReportPage(e, o, `Comparable sales grid`, l, `Sales comparison  ·  ${g.length} checked sale${g.length === 1 ? `` : `s`}${g.some((e) => e.auto) ? `  ·  * auto-selected` : ``}`);
+  b.drawText(
+    rl(
+      [
+        v.psf != null ? `Average sale price ${j(v.psf, 2)}/sf` : ``,
+        v.price != null ? `average price ${j(v.price)}` : ``,
+        y != null ? `income value ${j(y, 2)}/sf` : ``,
+        v.psf != null && y != null ? `sales vs income ${j(v.psf - y, 2)}/sf` : ``,
+      ]
+        .filter(Boolean)
+        .join(`  ·  `) || `Checked comparable sales used on the PTAB-6C grid.`,
+      110,
+    ),
+    { x: 36, y: 690, size: 8, font: i, color: Hc },
+  );
+  let nt = typeof crPdfWrap == `function` ? crPdfWrap(typeof crAutoPickRule == `function` ? crAutoPickRule() : ``, 118) : [],
+    ny = 678;
+  for (let line of nt.slice(0, 4)) (b.drawText(line, { x: 36, y: ny, size: 6.5, font: i, color: Uc }), (ny -= 9));
+  let x = [36, 52, 160, 306, 336, 392, 452, 510, 556],
+    S = [`#`, `PIN`, `Address`, `Mi`, `Sale date`, `Price`, `Bldg sf`, `Land sf`, `$ / sf`],
+    C2 = Math.min(662, ny - 8);
+  S.forEach((e, t) => b.drawText(e, { x: x[t], y: C2, size: 7, font: a, color: Uc }));
+  C2 -= 4;
+  b.drawLine({ start: { x: 36, y: C2 }, end: { x: 576, y: C2 }, thickness: 0.6, color: Wc });
+  C2 -= 12;
+  let P = (e, t, n, r, i2 = i) => {
+    C2 < 70 && ((b = crNewReportPage(e, o, `Comparable sales grid (continued)`, l, `Sales comparison`)), (C2 = 690));
+    n.forEach((e, n) => b.drawText(rl(String(e ?? `—`), t[n] || 12), { x: x[n], y: C2, size: 7, font: i2, color: r || Hc }));
+    C2 -= 12;
+  };
+  if (!g.length) P(e, [4, 18, 22, 8, 12, 12, 10, 10, 10], [`—`, `No comparable sales are checked.`, ``, ``, ``, ``, ``, ``, ``], Uc);
+  g.forEach((t) =>
+    P(e, [3, 20, 24, 6, 11, 11, 10, 9, 8], [`${t.n}${t.auto ? `*` : ``}`, t.pin, t.address, t.miS, t.date, t.price > 0 ? j(t.price) : `—`, t.bldg > 0 ? Math.round(t.bldg).toLocaleString() : `—`, t.land > 0 ? Math.round(t.land).toLocaleString() : `—`, t.psf != null ? j(t.psf, 2) : `—`], t.auto ? Hc : Hc, t.auto ? a : i),
+  );
+  C2 -= 4;
+  b.drawLine({ start: { x: 36, y: C2 + 8 }, end: { x: 576, y: C2 + 8 }, thickness: 0.6, color: Wc });
+  P(e, [3, 20, 24, 6, 11, 11, 10, 9, 8], [``, `Average`, ``, v.mi != null ? v.mi.toFixed(2) : `—`, ``, v.price != null ? j(v.price) : `—`, v.bldg != null ? Math.round(v.bldg).toLocaleString() : `—`, v.land != null ? Math.round(v.land).toLocaleString() : `—`, v.psf != null ? j(v.psf, 2) : `—`], Hc, a);
+  if (y != null)
+    b.drawText(`Subject income value ${j(y, 2)}/sf  ·  concluded ${j(c.concluded)}  ·  ${s.nra > 0 ? `${Math.round(s.nra).toLocaleString()} sf` : `no area on the case`}.`, { x: 36, y: Math.max(52, C2 - 6), size: 8, font: i, color: Hc });
+  {
+    let dy = Math.max(52, C2 - 6) - 12,
+      ds = typeof crAutoPickDetails == `function` ? crAutoPickDetails() : [];
+    for (let line of ds.flatMap((e) => (typeof crPdfWrap == `function` ? crPdfWrap(e, 118) : [e]))) {
+      if (dy < 46) break;
+      b.drawText(line, { x: 36, y: dy, size: 6.5, font: i, color: Uc });
+      dy -= 9;
+    }
+  }
+
+  /* Subject property data sheet */
+  let T = crLatestAv(s),
+    I = crCompExtraOf(s.pin),
+    A2 = s.lookup || {},
+    w2 = A2.parcel || {},
+    inc = A2.income || {},
+    z = crNewReportPage(e, o, `Subject property data`, l, `Subject data sheet  ·  PIN ${k(t.pin)}`);
+  let rows1 = [
+    [`PIN`, k(A(s.pin) || t.pin)],
+    [`Address`, s.address || t.address || `—`],
+    [`Township`, s.township || t.township || w2.township || `—`],
+    [`Tax code`, s.taxCode || w2.taxCode || `—`],
+    [`Class`, [w2.classCode || inc.classCode || s.classId, inc.use || ``].filter(Boolean).join(` · `) || t.classLine || `—`],
+    [`Level of assessment`, M(s.loa, 0)],
+    [`Land sf`, pl(I.landSf || inc.landsf) || `—`],
+    [`Building sf (NRA)`, pl(s.nra || I.bldgSf || inc.bldgsf || inc.nrsf) || `—`],
+    [`Year built / age`, I.yearBuilt || inc.yearbuilt ? crYb(I.yearBuilt || inc.yearbuilt, s.taxYear) : `—`],
+    [`Units`, s.units > 0 ? String(s.units) : `—`],
+    [`Tax year`, s.taxYear || `—`],
+    [`Equalization factor`, de(s.eqFactor, 4)],
+    [`Current / after AV`, j(t.afterAv || s.currentAv)],
+    [`Mailed AV`, T ? j(T.mailed_tot) : j(t.mailedAv)],
+    [`Land AV (current)`, T ? j((T.board_tot > 0 ? T.board_land : T.certified_land) || T.mailed_land) : `—`],
+    [`Improvement AV (current)`, T ? j((T.board_tot > 0 ? T.board_bldg : T.certified_bldg) || T.mailed_bldg) : `—`],
+    [`Requested MV`, s.requestedMv > 0 ? j(s.requestedMv) : `—`],
+    [`Requested AV`, s.requestedAv > 0 ? j(s.requestedAv) : `—`],
+    [`Docket / complaint`, t.caseNumber || s.caseNumber || `—`],
+    [`Appellant`, t.appellant || `—`],
+    [`Analyst`, s.analyst || t.analyst || `—`],
+  ];
+  crKvCol(z, 36, rows1, 688, o, 14);
+  let hist = (A2.av || []).slice(0, 8);
+  let hy = 688;
+  z.drawText(`Valuation history`, { x: 320, y: hy, size: 9, font: a, color: Hc });
+  hy -= 14;
+  if (!hist.length) z.drawText(`No Assessor valuation history loaded.`, { x: 320, y: hy, size: 8, font: i, color: Uc });
+  else {
+    z.drawText(`Year        Mailed            Certified         Board`, { x: 320, y: hy, size: 7, font: a, color: Uc });
+    hy -= 12;
+    for (let e of hist) {
+      z.drawText(`${e.year || ``}    ${String(e.mailed_tot > 0 ? Math.round(e.mailed_tot).toLocaleString() : `—`).padEnd(12)}  ${String(e.certified_tot > 0 ? Math.round(e.certified_tot).toLocaleString() : `—`).padEnd(12)}  ${e.board_tot > 0 ? Math.round(e.board_tot).toLocaleString() : `—`}`, { x: 320, y: hy, size: 7, font: i, color: Hc });
+      hy -= 12;
+    }
+  }
+  hy -= 8;
+  z.drawText(`Ten-year sale history`, { x: 320, y: hy, size: 9, font: a, color: Hc });
+  hy -= 14;
+  let sales = (A2.sales || []).filter((e) => e.sale_price > 0 || e.price > 0).slice(0, 6);
+  if (!sales.length) z.drawText(`No recorded sales in the last ten years.`, { x: 320, y: hy, size: 8, font: i, color: Uc });
+  else
+    for (let e of sales) {
+      let t = e.sale_date || e.saleDate,
+        n = t ? new Date(t).toLocaleDateString(`en-US`) : `—`,
+        r = e.sale_price || e.price;
+      z.drawText(rl(`${n}  ${r > 0 ? j(r) : `—`}  ${e.deed_type || e.deedType || ``}`, 48), { x: 320, y: hy, size: 7, font: i, color: Hc });
+      hy -= 12;
+    }
+}
+function crGridExtraRow(e, t) {
+  let n = crCompExtraOf(e.pin),
+    r = e.nra || n.bldgSf || 0,
+    i = e.landSf || n.landSf || 0,
+    a = e.salePrice > 0 && r > 0 ? e.salePrice / r : null,
+    o = e.distanceMi;
+  if (o == null && t && typeof gl == `function`) o = gl(t, e);
+  return {
+    pin: crPin14(e.pin) ? k(crPin14(e.pin)) : `—`,
+    address: String(e.address || `—`).replace(/\s*\(Analyst-entered\)\s*$/i, ``).split(`,`)[0],
+    mi: o,
+    miS: o != null ? (o < 0.05 ? `0.00` : o.toFixed(2)) : `—`,
+    date: e.saleDate ? new Date(e.saleDate).toLocaleDateString(`en-US`) : `—`,
+    price: e.salePrice || 0,
+    bldg: r,
+    land: i,
+    psf: a,
+    cls: e.classCode || ``,
+  };
+}
+/* ---------- PDF names: Analyst Report <docket>_<PIN>.pdf; PTAB <PIN14>_PTAB.pdf ---------- */
 function crPdfBase(e = crActiveSheet()) {
   let t = (e) => String(e ?? ``).replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, ``).trim(),
     n = t(e?.caseNumber),
     r = A(e?.pin ?? ``);
   return (n && r ? `${n}_${r}` : r ? (e?.sample ? `SAMPLE_${r}` : r) : n || `commercial-review`).replace(/^[.\s]+|[.\s]+$/g, ``) || `commercial-review`;
+}
+function crPtabPdfBase(e = crActiveSheet()) {
+  let t = A(e?.pin ?? e?.keypin ?? ``) || A(crActiveSheet()?.pin ?? crActiveSheet()?.keypin ?? ``);
+  return `${t || `subject`}_PTAB`;
 }
 /* Print with document.title set so the browser's Save as PDF defaults to <docket>_<PIN>.pdf. */
 function crTitledPrint(e) {
