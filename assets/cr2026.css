@@ -295,3 +295,9 @@ main{max-width:100%;overflow-x:clip}
 .cr-pdf-modal-msg{margin:0;padding:8px 14px;font-size:13px;color:var(--color-muted,#444)}
 .cr-pdf-modal-frame{flex:1;width:100%;border:0;background:#525659}
 @media print{.cr-pdf-modal{display:none!important}}
+
+.cr-sample-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:12px 0 0;padding:10px 14px;border:1px solid #c9a227;border-radius:8px;background:#fbf6e6;color:#3a3416;font-size:14px}
+.cr-sample-banner strong{font-weight:700}
+.cr-sample-banner span{flex:1 1 220px;min-width:0}
+.cr-sample-banner .btn{margin-left:auto;min-height:40px}
+@media print{.cr-sample-banner{display:none!important}}

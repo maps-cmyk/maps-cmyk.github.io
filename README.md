@@ -41,6 +41,8 @@ The top of the page is the entry point:
    * Parcel Sales `wvhk-k5uv`: 10-year sale history for the subject, plus comps
    * Assessor Commercial Valuation `csik-bsws`: income data for the worksheet and the equitability averages
    * BOR Appeal Decision History `7pny-nedm`: prior BOR decisions and the tax code
+On launch, if no case is in the URL and you are not returning to a saved (non-sample) case, the app loads a **random sample** from a curated pool of properties that already have at least four same-class comparable sales, complete income data, assessed value, and an Assessor photo. The case is labeled **Sample case — random example**, with a **Show another sample** button. These samples do not overwrite saved analyst cases. Search, Look up, and New case still cover every property in the catalog.
+
 3. Comps are limited to **sales in the last 2 years within 15 miles** of the subject. The **4 best comps** are auto-checked (same or similar class first, then closeness in building size, distance, and sale recency). Multi-parcel, non-arm's-length deed types, and extreme $/sf outliers are excluded when flagged. Analysts can check or uncheck other sales and add manual comps. Distances are straight-line miles.
 4. *(Optional)* **Load the Commercial Review Extract CSV**. It stays in this browser (IndexedDB) and is never uploaded. Typing a docket number or PIN then also fills complaint status, requested value and the other BOR docket fields.
 5. Make the report: **PTAB PDF (State Form)** or **Analyst Report** (see Reports). There are no CSV/JSON exports, no "Reviewed" flag, and no separate copy-worksheet or print-worksheet buttons; the two reports are the only outputs. Cases are still saved in this browser.
